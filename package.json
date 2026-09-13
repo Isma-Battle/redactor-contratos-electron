@@ -35,8 +35,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "TU-USUARIO-DE-GITHUB",
-      "repo": "TU-REPOSITORIO"
+      "owner": "Isma-Battle",
+      "repo": "redactor-contratos-electron"
     },
     "win": {
       "target": ["nsis"]
