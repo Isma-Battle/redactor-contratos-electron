@@ -12,12 +12,13 @@
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
-    "release": "electron-builder --publish always"
+    "release": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
@@ -34,8 +35,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "Isma-Battle",
-      "repo": "redactor-contratos-electron"
+      "owner": "TU-USUARIO-DE-GITHUB",
+      "repo": "TU-REPOSITORIO"
     },
     "win": {
       "target": ["nsis"]
