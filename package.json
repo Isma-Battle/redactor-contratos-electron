@@ -35,7 +35,7 @@
     "publish": {
       "provider": "github",
       "owner": "Isma-Battle",
-      "repo": "editoragreement"
+      "repo": "redactor-contratos-electron"
     },
     "win": {
       "target": ["nsis"]
