@@ -1,0 +1,23 @@
+const crypto = require('crypto');
+
+function b64ToBytes(b64) {
+  return Buffer.from(b64, 'base64');
+}
+
+const key = b64ToBytes('d7xFYKhJHQGsurVVSb3mo7znnsqo5ZeBnUKw6r0eHsA=');
+const iv = b64ToBytes('0lGZs8eu4cBbsnC2');
+const fullCiphertext = b64ToBytes('Hed2QdDtodzDFP+BGKgDBgZyVMwIeHl49shYsKLMseGpYTL0UQPA6DwUI53x/+lCDzP5GrPz9ZDiduE8Vgw2twtqlNqrC/Arq+QKlIB1yTqapV4hKCB/haxGoy4quXzXCC01Ga9mepOpMnG93K4QtIm54jmO1WITnTcocLPySaxKqkceFiCsnPTPkVUKe89GmMwdI1mmSuddwule0PkDyZL+j/+1lvlgQFl7hUcR/SIb3bC+Bki2K5+FksVsQQW8ZhYD/+10Al+a6Yd7SuDlj1EG5C0yCcdxsQfbz83qwk74lQ0EaLhJKSUzN3RQDfd0ovNTStxEXGMYxrd4RWYaM2tPzmuc/Sy7hj7YJZ2WNKrbxCiUZldT/9yj8WcfWAkMOiFYX46NSYmD7mdOZmZkxBEqvfNawQG2cMqnKrKi/M7PjG3m4cVBr2YTJuzt/24YRB69LeFCkiZgK1zLkumIlNSI9YQ9IIXp8dM4jH+7N9LilrjZdjbWBDexauD2nPPnn2hSA66vS8fx0IllKsAlAlPHjtDA9Rf0wyFr8yinlzyRxxN6T3RueDxWiwasyvmthv3eajbq0U451bVuTTzz5VXR+x9+LItC8QwAISyutV3q57uu8gd5GmqcQYsa+SpEj6a4f050N8SHKVqaDSJ8Ann4Hyo/A5bfjDVeTYAMk8qOgZlPbC20WJt8TgC73+75JIPg8VzYh11LfUTWCRsuCGc6pHKpRA4Uk7Iu01y1ueT2HbYGp1Zy1OjoPYIUwnKaeUmAZ+k8zQ2Ux5zjVYUyzJdXLe64zVtD5zp/8zZSddFhBWdrL7rYWumggr3cq91XVG5uns69tckS330lTP4I6oeVhiM34MZRhz+/2Mskd970mIwy3tuoxmv0hVCbTDhxDLz1W1CohU+vl2ZMoL79fP+X075ZB943wFeMsxsgXIlj1xQ1KvZFbboB7g8OyxYpDQ6em6ZXt+3C4tvHAWqcY9h6WT0WWMFOjyUYcXI+HRSG5ABEu9FVMaCFtmXhHidGM6sV3PskO3Cw++F7PXItBYIBeyRmuJFtK5v6soclM/viLfOvxEZkdOU9Ug5HNZZtJbgMrfWoLdxP0gQqNPu2A/ezW2BaeulzjBg3bw+pqDiQHi7Miao6JQ4DnsZOBY1Sp84qSYjh/WTXD7sJsaDgvK8mC0ovohCVbfqsdDLAwLYduA3Nm6mOJVrjDhSrSurvCaXGzTzO3Wp1+J55xhIdHPWFWsHGbf/+6//8lRuYjUiQTPBkK/ZGKvDKycgRoKHKAups8DCo4g3gBy24kjy52kRQXdcM90ldR9p/geBLpH0to3cpFHlOXs0kRpbiYEGyoTtewdwhTzF00i+1cOoX/KzIfOVLlr49poqliRoyQHguEKZjPiugHD54St+UjN4gcVJSGvQwslArlZFyOrnSK8Iqm79bB1Dagp1XyaT4cfVsG/e2HGuzZ9VdM0rriMuKDz/0rO9LPU/MKi/Jiwh618B7uNSmeI+iolDiW/FLt0PzuO3iUdap7P1ohgvHK9zFhz4kB60BAzGmIZiSEf+QzOSkilzrbC8E1ZdSQOs9uo3uzyHAsOpk5zq4xTieSkqJXRaaQgLwZ68ChtvsJlRsUUmdkDCgk4wxY1ErOH1ocZxl8m8+U/LA7iSi4Ncy+UsJm2CWMciGlU9N3MEXn5uYBVJkzIMXqnZFzLx4O/YtVibuRrf90V1SaJXTdPb50WPbTQO17vy1+tkkClBpQ9G3EzDFukfr+bWiLQfc2fXipq2ThKZYZcM+TskFop4PxQbboqvAA0BP5iMBZP2YuOWb3BeF7kAb4Hh5S2EiImgON6PWyXke9q9850DD1cZnfy1Rr2N31DMWQzpGhdf5U5fWFLLzl/+vhYU5YFXeAskTsxgNtuBmK9mTecMki');
+
+// En AES-GCM, los últimos 16 bytes son el tag de autenticación
+const tagLength = 16;
+const ciphertext = fullCiphertext.slice(0, fullCiphertext.length - tagLength);
+const tag = fullCiphertext.slice(fullCiphertext.length - tagLength);
+
+try {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  console.log(decrypted.toString('utf-8'));
+} catch (err) {
+  console.error('Error al descifrar:', err.message);
+}
