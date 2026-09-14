@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redactor de Contratos v1.0.4</title>
+<title>Redactor de Contratos v1.0.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -201,6 +201,24 @@
     gap:7px;
   }
   .theme-toggle .icon{font-size:0.95rem; line-height:1;}
+
+  .update-toggle{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+  }
+  .update-toggle .icon{
+    font-size:0.95rem;
+    line-height:1;
+    display:inline-block;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .update-toggle .icon.spinning{
+    animation: spin 1s linear infinite;
+  }
 
   .btn-brass{
     background:var(--brass);
@@ -799,6 +817,9 @@
     <span class="sub">edita, marca campos, incrusta imágenes, guarda versiones</span>
   </div>
   <div class="topbar-actions">
+    <button class="btn-ghost update-toggle" id="btnCheckUpdates" title="Buscar nuevas versiones">
+      <span class="icon" id="updateBtnIcon">⟳</span><span id="updateBtnLabel">Buscar actualizaciones</span>
+    </button>
     <button class="btn-ghost theme-toggle" id="btnThemeToggle" title="Cambiar entre tema claro y oscuro">
       <span class="icon" id="themeToggleIcon">☾</span><span id="themeToggleLabel">Oscuro</span>
     </button>
@@ -1004,6 +1025,78 @@
       noticeOkBtn.addEventListener('click', onOk);
       noticeCancelBtn.addEventListener('click', onCancel);
     });
+  }
+
+  // ---------- Buscar actualizaciones ----------
+  const btnCheckUpdates = document.getElementById('btnCheckUpdates');
+  const updateBtnLabel = document.getElementById('updateBtnLabel');
+  const updateBtnIcon = document.getElementById('updateBtnIcon');
+
+  function setUpdateBusy(busy){
+    if (!btnCheckUpdates) return;
+    btnCheckUpdates.disabled = busy;
+    if (updateBtnIcon) updateBtnIcon.classList.toggle('spinning', busy);
+  }
+
+  if (btnCheckUpdates) {
+    if (window.rcUpdater && window.rcUpdater.check) {
+      btnCheckUpdates.addEventListener('click', () => {
+        setUpdateBusy(true);
+        updateBtnLabel.textContent = 'Buscando...';
+        window.rcUpdater.check();
+      });
+
+      if (window.rcUpdater.onStatus) {
+        window.rcUpdater.onStatus(({ status, data }) => {
+          switch (status) {
+            case 'checking':
+              setUpdateBusy(true);
+              updateBtnLabel.textContent = 'Buscando...';
+              break;
+
+            case 'dev-mode':
+              setUpdateBusy(false);
+              updateBtnLabel.textContent = 'Buscar actualizaciones';
+              showNotice('Estás en modo desarrollo: las actualizaciones automáticas solo funcionan en la app instalada (empaquetada).', 'Modo desarrollo');
+              break;
+
+            case 'not-available':
+              setUpdateBusy(false);
+              updateBtnLabel.textContent = 'Buscar actualizaciones';
+              showNotice('Ya tienes la última versión instalada.', 'Sin novedades');
+              break;
+
+            case 'available':
+              updateBtnLabel.textContent = 'Descargando v' + (data && data.version ? data.version : '') + '...';
+              break;
+
+            case 'downloading':
+              updateBtnLabel.textContent = 'Descargando... ' + (data && data.percent != null ? data.percent + '%' : '');
+              break;
+
+            case 'downloaded':
+              setUpdateBusy(false);
+              updateBtnLabel.textContent = 'Buscar actualizaciones';
+              showConfirmDialog('Se descargó una nueva versión. ¿Reiniciar la aplicación ahora para instalarla?', 'Actualización lista')
+                .then((ok) => {
+                  if (ok && window.rcUpdater.installNow) window.rcUpdater.installNow();
+                });
+              break;
+
+            case 'error':
+              setUpdateBusy(false);
+              updateBtnLabel.textContent = 'Buscar actualizaciones';
+              showNotice('Error al buscar actualizaciones: ' + (data && data.message ? data.message : 'desconocido'), 'Error');
+              break;
+          }
+        });
+      }
+    } else {
+      // Sin API de actualizaciones disponible (por ejemplo, abierto fuera
+      // de Electron): se deshabilita el botón en vez de dejarlo sin efecto.
+      btnCheckUpdates.disabled = true;
+      btnCheckUpdates.title = 'Buscar actualizaciones no está disponible en este entorno.';
+    }
   }
 
   const editor = document.getElementById('editor');
