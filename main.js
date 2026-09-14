@@ -95,6 +95,11 @@ function openPreviewWindow() {
   });
  
   previewWindow.setMenuBarVisibility(false);
+  previewWindow.webContents.on('preload-error', (event, preloadPath, error) => {
+  console.error('ERROR EN PRELOAD:', preloadPath, error);
+});
+
+previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
   previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
  
   previewWindow.once('ready-to-show', () => {

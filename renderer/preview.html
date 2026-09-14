@@ -1,371 +1,371 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Vista previa de impresión</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --ink:#1E2A38;
-    --ink-soft:#3B4A5C;
-    --paper:#FBF8F0;
-    --brass:#A9793B;
-    --brass-dark:#8A5F28;
-    --wine:#7A2E2E;
-    --muted:#6B6455;
-    --line:#DAD3BF;
-    --panel:#F1ECE0;
-    --ok:#3F6B4A;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;}
-  body{
-    background:var(--ink);
-    color:#F6F1E4;
-    font-family:'IBM Plex Sans', sans-serif;
-    display:flex;
-    flex-direction:column;
-    height:100vh;
-    overflow:hidden;
-  }
- 
-  .modal-topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:14px 20px;
-    border-bottom:1px solid rgba(255,255,255,0.1);
-    flex-shrink:0;
-  }
-  .modal-topbar h1{
-    font-family:'Source Serif 4', serif;
-    font-weight:600;
-    font-size:1.05rem;
-    margin:0;
-    color:#F6F1E4;
-  }
-  .btn-close-x{
-    background:transparent;
-    border:1px solid rgba(255,255,255,0.22);
-    color:#F0E9D8;
-    width:30px;
-    height:30px;
-    border-radius:6px;
-    cursor:pointer;
-    font-size:1rem;
-    line-height:1;
-  }
-  .btn-close-x:hover{background:rgba(255,255,255,0.08);}
- 
-  .modal-body{
-    flex:1;
-    display:grid;
-    grid-template-columns:1fr 280px;
-    gap:0;
-    min-height:0;
-  }
- 
-  .pdf-pane{
-    background:#0F1620;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:18px;
-    min-height:0;
-  }
-  .pdf-frame-wrap{
-    width:100%;
-    height:100%;
-    background:var(--paper);
-    border-radius:4px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.4);
-    overflow:hidden;
-  }
-  .pdf-frame-wrap iframe{
-    width:100%;
-    height:100%;
-    border:none;
-  }
-  .pdf-loading{
-    color:#C9BFA6;
-    font-size:0.85rem;
-    text-align:center;
-  }
- 
-  .controls-pane{
-    background:var(--panel);
-    padding:20px;
-    overflow-y:auto;
-    color:var(--ink);
-  }
-  .controls-pane h2{
-    font-family:'Source Serif 4', serif;
-    font-size:0.95rem;
-    margin:0 0 14px;
-    color:var(--ink);
-  }
-  .field{
-    margin-bottom:14px;
-  }
-  .field label{
-    display:block;
-    font-size:0.72rem;
-    text-transform:uppercase;
-    letter-spacing:0.04em;
-    color:var(--brass-dark);
-    font-weight:600;
-    margin-bottom:6px;
-  }
-  .field select, .field input[type="number"]{
-    width:100%;
-    border:1px solid var(--line);
-    border-radius:6px;
-    padding:8px 9px;
-    font-family:'IBM Plex Sans', sans-serif;
-    font-size:0.85rem;
-    color:var(--ink);
-    background:#fff;
-  }
-  .checkbox-row{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    margin-bottom:10px;
-    font-size:0.85rem;
-  }
-  .checkbox-row input{width:16px;height:16px;}
- 
-  .actions{
-    margin-top:22px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  button{
-    font-family:'IBM Plex Sans', sans-serif;
-    font-size:0.85rem;
-    font-weight:600;
-    border-radius:6px;
-    border:1px solid transparent;
-    padding:10px 14px;
-    cursor:pointer;
-  }
-  button:disabled{opacity:0.5;cursor:not-allowed;}
-  .btn-brass{background:var(--brass); color:#241705;}
-  .btn-brass:hover:not(:disabled){background:var(--brass-dark); color:#F6F1E4;}
-  .btn-panel{background:#fff; border-color:var(--line); color:var(--ink-soft);}
-  .btn-panel:hover:not(:disabled){background:#fff; border-color:var(--brass); color:var(--ink);}
- 
-  .preview-status{
-    margin-top:14px;
-    font-size:0.78rem;
-    color:var(--muted);
-    min-height:16px;
-    line-height:1.4;
-  }
-</style>
-</head>
-<body>
- 
-<div class="modal-topbar">
-  <h1>Vista previa de impresión</h1>
-  <button class="btn-close-x" id="btnClose" title="Cerrar">×</button>
-</div>
- 
-<div class="modal-body">
-  <div class="pdf-pane">
-    <div class="pdf-frame-wrap" id="pdfFrameWrap">
-      <iframe id="pdfFrame" title="Vista previa del contrato"></iframe>
-    </div>
-  </div>
- 
-  <div class="controls-pane">
-    <h2>Opciones de impresión</h2>
- 
-    <div class="field">
-      <label for="printerSelect">Impresora</label>
-      <select id="printerSelect"></select>
-    </div>
- 
-    <div class="field">
-      <label for="copiesInput">Copias</label>
-      <input type="number" id="copiesInput" min="1" value="1">
-    </div>
- 
-    <div class="field">
-      <label for="paperSelect">Tipo de papel</label>
-      <select id="paperSelect">
-        <option value="A4" selected>A4</option>
-        <option value="Letter">Carta (Letter)</option>
-        <option value="Legal">Oficio (Legal)</option>
-        <option value="A3">A3</option>
-        <option value="A5">A5</option>
-        <option value="Tabloid">Tabloid</option>
-      </select>
-    </div>
- 
-    <div class="field">
-      <label for="marginsSelect">Márgenes</label>
-      <select id="marginsSelect">
-        <option value="default">Predeterminados</option>
-        <option value="none">Sin márgenes</option>
-        <option value="printableArea">Área imprimible mínima</option>
-      </select>
-    </div>
- 
-    <div class="checkbox-row">
-      <input type="checkbox" id="colorCheckbox" checked>
-      <label for="colorCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Color</label>
-    </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="landscapeCheckbox">
-      <label for="landscapeCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Horizontal</label>
-    </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="bgCheckbox" checked>
-      <label for="bgCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Incluir fondo/color de fondo</label>
-    </div>
- 
-    <div class="actions">
-      <button class="btn-brass" id="btnPrint">Imprimir</button>
-      <button class="btn-panel" id="btnSave">Guardar como PDF</button>
-      <button class="btn-panel" id="btnCancel">Cerrar</button>
-    </div>
- 
-    <div class="preview-status" id="previewStatus"></div>
-  </div>
-</div>
- 
-<script>
-(function(){
-  const printerSelect = document.getElementById('printerSelect');
-  const copiesInput = document.getElementById('copiesInput');
-  const paperSelect = document.getElementById('paperSelect');
-  const marginsSelect = document.getElementById('marginsSelect');
-  const colorCheckbox = document.getElementById('colorCheckbox');
-  const landscapeCheckbox = document.getElementById('landscapeCheckbox');
-  const bgCheckbox = document.getElementById('bgCheckbox');
-  const pdfFrame = document.getElementById('pdfFrame');
-  const btnPrint = document.getElementById('btnPrint');
-  const btnSave = document.getElementById('btnSave');
-  const btnCancel = document.getElementById('btnCancel');
-  const btnClose = document.getElementById('btnClose');
-  const statusEl = document.getElementById('previewStatus');
- 
-  async function init(){
-    try {
-      const url = await window.previewAPI.getPdfUrl();
-      if (url) {
-        pdfFrame.src = url;
-      } else {
-        statusEl.textContent = 'No se pudo generar la vista previa del documento.';
-      }
-    } catch (err) {
-      statusEl.textContent = 'Error cargando la vista previa.';
+  <!DOCTYPE html>
+  <html lang="es">
+  <head>
+  <meta charset="UTF-8">
+  <title>Vista previa de impresión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#1E2A38;
+      --ink-soft:#3B4A5C;
+      --paper:#FBF8F0;
+      --brass:#A9793B;
+      --brass-dark:#8A5F28;
+      --wine:#7A2E2E;
+      --muted:#6B6455;
+      --line:#DAD3BF;
+      --panel:#F1ECE0;
+      --ok:#3F6B4A;
     }
- 
-    try {
-      const printers = await window.previewAPI.getPrinters();
-      printerSelect.innerHTML = '';
-      if (!printers || printers.length === 0) {
-        const opt = document.createElement('option');
-        opt.textContent = 'No se detectaron impresoras';
-        opt.disabled = true;
-        opt.selected = true;
-        printerSelect.appendChild(opt);
-        btnPrint.disabled = true;
-      } else {
-        printers.forEach((p) => {
+    *{box-sizing:border-box;}
+    html,body{margin:0;padding:0;height:100%;}
+    body{
+      background:var(--ink);
+      color:#F6F1E4;
+      font-family:'IBM Plex Sans', sans-serif;
+      display:flex;
+      flex-direction:column;
+      height:100vh;
+      overflow:hidden;
+    }
+  
+    .modal-topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:14px 20px;
+      border-bottom:1px solid rgba(255,255,255,0.1);
+      flex-shrink:0;
+    }
+    .modal-topbar h1{
+      font-family:'Source Serif 4', serif;
+      font-weight:600;
+      font-size:1.05rem;
+      margin:0;
+      color:#F6F1E4;
+    }
+    .btn-close-x{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.22);
+      color:#F0E9D8;
+      width:30px;
+      height:30px;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:1rem;
+      line-height:1;
+    }
+    .btn-close-x:hover{background:rgba(255,255,255,0.08);}
+  
+    .modal-body{
+      flex:1;
+      display:grid;
+      grid-template-columns:1fr 280px;
+      gap:0;
+      min-height:0;
+    }
+  
+    .pdf-pane{
+      background:#0F1620;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      min-height:0;
+    }
+    .pdf-frame-wrap{
+      width:100%;
+      height:100%;
+      background:var(--paper);
+      border-radius:4px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.4);
+      overflow:hidden;
+    }
+    .pdf-frame-wrap iframe{
+      width:100%;
+      height:100%;
+      border:none;
+    }
+    .pdf-loading{
+      color:#C9BFA6;
+      font-size:0.85rem;
+      text-align:center;
+    }
+  
+    .controls-pane{
+      background:var(--panel);
+      padding:20px;
+      overflow-y:auto;
+      color:var(--ink);
+    }
+    .controls-pane h2{
+      font-family:'Source Serif 4', serif;
+      font-size:0.95rem;
+      margin:0 0 14px;
+      color:var(--ink);
+    }
+    .field{
+      margin-bottom:14px;
+    }
+    .field label{
+      display:block;
+      font-size:0.72rem;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+      color:var(--brass-dark);
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .field select, .field input[type="number"]{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:6px;
+      padding:8px 9px;
+      font-family:'IBM Plex Sans', sans-serif;
+      font-size:0.85rem;
+      color:var(--ink);
+      background:#fff;
+    }
+    .checkbox-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:10px;
+      font-size:0.85rem;
+    }
+    .checkbox-row input{width:16px;height:16px;}
+  
+    .actions{
+      margin-top:22px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    button{
+      font-family:'IBM Plex Sans', sans-serif;
+      font-size:0.85rem;
+      font-weight:600;
+      border-radius:6px;
+      border:1px solid transparent;
+      padding:10px 14px;
+      cursor:pointer;
+    }
+    button:disabled{opacity:0.5;cursor:not-allowed;}
+    .btn-brass{background:var(--brass); color:#241705;}
+    .btn-brass:hover:not(:disabled){background:var(--brass-dark); color:#F6F1E4;}
+    .btn-panel{background:#fff; border-color:var(--line); color:var(--ink-soft);}
+    .btn-panel:hover:not(:disabled){background:#fff; border-color:var(--brass); color:var(--ink);}
+  
+    .preview-status{
+      margin-top:14px;
+      font-size:0.78rem;
+      color:var(--muted);
+      min-height:16px;
+      line-height:1.4;
+    }
+  </style>
+  </head>
+  <body>
+  
+  <div class="modal-topbar">
+    <h1>Vista previa de impresión</h1>
+    <button class="btn-close-x" id="btnClose" title="Cerrar">×</button>
+  </div>
+  
+  <div class="modal-body">
+    <div class="pdf-pane">
+      <div class="pdf-frame-wrap" id="pdfFrameWrap">
+        <iframe id="pdfFrame" title="Vista previa del contrato"></iframe>
+      </div>
+    </div>
+  
+    <div class="controls-pane">
+      <h2>Opciones de impresión</h2>
+  
+      <div class="field">
+        <label for="printerSelect">Impresora</label>
+        <select id="printerSelect"></select>
+      </div>
+  
+      <div class="field">
+        <label for="copiesInput">Copias</label>
+        <input type="number" id="copiesInput" min="1" value="1">
+      </div>
+  
+      <div class="field">
+        <label for="paperSelect">Tipo de papel</label>
+        <select id="paperSelect">
+          <option value="A4" selected>A4</option>
+          <option value="Letter">Carta (Letter)</option>
+          <option value="Legal">Oficio (Legal)</option>
+          <option value="A3">A3</option>
+          <option value="A5">A5</option>
+          <option value="Tabloid">Tabloid</option>
+        </select>
+      </div>
+  
+      <div class="field">
+        <label for="marginsSelect">Márgenes</label>
+        <select id="marginsSelect">
+          <option value="default">Predeterminados</option>
+          <option value="none">Sin márgenes</option>
+          <option value="printableArea">Área imprimible mínima</option>
+        </select>
+      </div>
+  
+      <div class="checkbox-row">
+        <input type="checkbox" id="colorCheckbox" checked>
+        <label for="colorCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Color</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="landscapeCheckbox">
+        <label for="landscapeCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Horizontal</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="bgCheckbox" checked>
+        <label for="bgCheckbox" style="margin:0;text-transform:none;letter-spacing:normal;font-weight:500;color:var(--ink);">Incluir fondo/color de fondo</label>
+      </div>
+  
+      <div class="actions">
+        <button class="btn-brass" id="btnPrint">Imprimir</button>
+        <button class="btn-panel" id="btnSave">Guardar como PDF</button>
+        <button class="btn-panel" id="btnCancel">Cerrar</button>
+      </div>
+  
+      <div class="preview-status" id="previewStatus"></div>
+    </div>
+  </div>
+  
+  <script>
+  (function(){
+    const printerSelect = document.getElementById('printerSelect');
+    const copiesInput = document.getElementById('copiesInput');
+    const paperSelect = document.getElementById('paperSelect');
+    const marginsSelect = document.getElementById('marginsSelect');
+    const colorCheckbox = document.getElementById('colorCheckbox');
+    const landscapeCheckbox = document.getElementById('landscapeCheckbox');
+    const bgCheckbox = document.getElementById('bgCheckbox');
+    const pdfFrame = document.getElementById('pdfFrame');
+    const btnPrint = document.getElementById('btnPrint');
+    const btnSave = document.getElementById('btnSave');
+    const btnCancel = document.getElementById('btnCancel');
+    const btnClose = document.getElementById('btnClose');
+    const statusEl = document.getElementById('previewStatus');
+  
+    async function init(){
+      try {
+        const url = await window.previewAPI.getPdfUrl();
+        if (url) {
+          pdfFrame.src = url;
+        } else {
+          statusEl.textContent = 'No se pudo generar la vista previa del documento.';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error cargando la vista previa.';
+      }
+  
+      try {
+        const printers = await window.previewAPI.getPrinters();
+        printerSelect.innerHTML = '';
+        if (!printers || printers.length === 0) {
           const opt = document.createElement('option');
-          opt.value = p.name;
-          opt.textContent = p.displayName || p.name;
-          if (p.isDefault) opt.selected = true;
+          opt.textContent = 'No se detectaron impresoras';
+          opt.disabled = true;
+          opt.selected = true;
           printerSelect.appendChild(opt);
+          btnPrint.disabled = true;
+        } else {
+          printers.forEach((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.displayName || p.name;
+            if (p.isDefault) opt.selected = true;
+            printerSelect.appendChild(opt);
+          });
+        }
+      } catch (err) {
+        statusEl.textContent = 'No se pudieron obtener las impresoras disponibles.';
+      }
+    }
+  
+    // Regenera el PDF de vista previa cuando cambia el papel o la
+    // orientación, para que se vea igual a lo que se va a imprimir.
+    async function refreshPreview(){
+      statusEl.textContent = 'Actualizando vista previa...';
+      try {
+        const url = await window.previewAPI.updatePreview({
+          pageSize: paperSelect.value,
+          landscape: landscapeCheckbox.checked
         });
+        if (url) {
+          pdfFrame.src = url;
+          statusEl.textContent = '';
+        } else {
+          statusEl.textContent = 'No se pudo actualizar la vista previa.';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error actualizando la vista previa.';
       }
-    } catch (err) {
-      statusEl.textContent = 'No se pudieron obtener las impresoras disponibles.';
     }
-  }
- 
-  // Regenera el PDF de vista previa cuando cambia el papel o la
-  // orientación, para que se vea igual a lo que se va a imprimir.
-  async function refreshPreview(){
-    statusEl.textContent = 'Actualizando vista previa...';
-    try {
-      const url = await window.previewAPI.updatePreview({
-        pageSize: paperSelect.value,
-        landscape: landscapeCheckbox.checked
-      });
-      if (url) {
-        pdfFrame.src = url;
-        statusEl.textContent = '';
-      } else {
-        statusEl.textContent = 'No se pudo actualizar la vista previa.';
-      }
-    } catch (err) {
-      statusEl.textContent = 'Error actualizando la vista previa.';
-    }
-  }
-  paperSelect.addEventListener('change', refreshPreview);
-  landscapeCheckbox.addEventListener('change', refreshPreview);
- 
-  btnPrint.addEventListener('click', async () => {
-    btnPrint.disabled = true;
-    statusEl.textContent = 'Enviando a la impresora...';
-    try {
-      const result = await window.previewAPI.executePrint({
-        deviceName: printerSelect.value,
-        copies: copiesInput.value,
-        color: colorCheckbox.checked,
-        landscape: landscapeCheckbox.checked,
-        printBackground: bgCheckbox.checked,
-        pageSize: paperSelect.value,
-        marginsType: marginsSelect.value
-      });
-      if (result && result.success) {
-        statusEl.textContent = 'Documento enviado a la impresora correctamente. Cerrando...';
-        // Cierra la vista previa automáticamente tras imprimir con éxito.
-        setTimeout(closeModal, 900);
-      } else {
-        statusEl.textContent = 'No se pudo imprimir' + (result && result.errorType ? (': ' + result.errorType) : '.');
+    paperSelect.addEventListener('change', refreshPreview);
+    landscapeCheckbox.addEventListener('change', refreshPreview);
+  
+    btnPrint.addEventListener('click', async () => {
+      btnPrint.disabled = true;
+      statusEl.textContent = 'Enviando a la impresora...';
+      try {
+        const result = await window.previewAPI.executePrint({
+          deviceName: printerSelect.value,
+          copies: copiesInput.value,
+          color: colorCheckbox.checked,
+          landscape: landscapeCheckbox.checked,
+          printBackground: bgCheckbox.checked,
+          pageSize: paperSelect.value,
+          marginsType: marginsSelect.value
+        });
+        if (result && result.success) {
+          statusEl.textContent = 'Documento enviado a la impresora correctamente. Cerrando...';
+          // Cierra la vista previa automáticamente tras imprimir con éxito.
+          setTimeout(closeModal, 900);
+        } else {
+          statusEl.textContent = 'No se pudo imprimir' + (result && result.errorType ? (': ' + result.errorType) : '.');
+          btnPrint.disabled = false;
+        }
+      } catch (err) {
+        statusEl.textContent = 'Ocurrió un error al imprimir.';
         btnPrint.disabled = false;
       }
-    } catch (err) {
-      statusEl.textContent = 'Ocurrió un error al imprimir.';
-      btnPrint.disabled = false;
-    }
-  });
- 
-  btnSave.addEventListener('click', async () => {
-    btnSave.disabled = true;
-    statusEl.textContent = 'Guardando PDF...';
-    try {
-      const result = await window.previewAPI.savePdf();
-      if (result && result.success) {
-        statusEl.textContent = 'PDF guardado en: ' + result.filePath;
-      } else if (result && result.canceled) {
-        statusEl.textContent = '';
-      } else {
-        statusEl.textContent = 'No se pudo guardar el PDF.';
+    });
+  
+    btnSave.addEventListener('click', async () => {
+      btnSave.disabled = true;
+      statusEl.textContent = 'Guardando PDF...';
+      try {
+        const result = await window.previewAPI.savePdf();
+        if (result && result.success) {
+          statusEl.textContent = 'PDF guardado en: ' + result.filePath;
+        } else if (result && result.canceled) {
+          statusEl.textContent = '';
+        } else {
+          statusEl.textContent = 'No se pudo guardar el PDF.';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Ocurrió un error al guardar el PDF.';
+      } finally {
+        btnSave.disabled = false;
       }
-    } catch (err) {
-      statusEl.textContent = 'Ocurrió un error al guardar el PDF.';
-    } finally {
-      btnSave.disabled = false;
+    });
+  
+    function closeModal(){
+      if (window.previewAPI && window.previewAPI.close) window.previewAPI.close();
     }
-  });
- 
-  function closeModal(){
-    if (window.previewAPI && window.previewAPI.close) window.previewAPI.close();
-  }
-  btnCancel.addEventListener('click', closeModal);
-  btnClose.addEventListener('click', closeModal);
- 
-  init();
-})();
-</script>
- 
-</body>
-</html>
+    btnCancel.addEventListener('click', closeModal);
+    btnClose.addEventListener('click', closeModal);
+  
+    init();
+  })();
+  </script>
+  
+  </body>
+  </html>

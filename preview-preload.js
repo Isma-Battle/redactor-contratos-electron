@@ -2,7 +2,7 @@
 // Expone la API que usa preview.html: obtener la URL del PDF generado,
 // la lista de impresoras, ejecutar la impresión real (sobre la ventana
 // principal), guardar el PDF y cerrar el modal.
- 
+ console.log('>>> preview-preload.js se está ejecutando');
 const { contextBridge, ipcRenderer } = require('electron');
  
 contextBridge.exposeInMainWorld('previewAPI', {
