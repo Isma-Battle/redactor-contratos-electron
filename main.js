@@ -7,6 +7,7 @@ const { pathToFileURL } = require('url');
  
 let mainWindow = null;
 let previewWindow = null;
+let printerProbeWindow = null;
 let currentPdfPath = null;
  
 // ---------------------------------------------------------------
@@ -96,10 +97,9 @@ function openPreviewWindow() {
  
   previewWindow.setMenuBarVisibility(false);
   previewWindow.webContents.on('preload-error', (event, preloadPath, error) => {
-  console.error('ERROR EN PRELOAD:', preloadPath, error);
-});
-
-previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
+    console.error('ERROR EN PRELOAD:', preloadPath, error);
+  });
+ 
   previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
  
   previewWindow.once('ready-to-show', () => {
@@ -157,12 +157,36 @@ ipcMain.handle('rc-get-pdf-path', () => {
   return pathToFileURL(currentPdfPath).href;
 });
  
-ipcMain.handle('rc-get-printers', async () => {
+// Ventana oculta dedicada solo a consultar impresoras. La separamos del
+// webContents de mainWindow porque printToPDF() repetido (al cambiar papel
+// u orientación en el preview) puede dejar el print backend en mal estado
+// y getPrintersAsync() empieza a devolver [] sin lanzar error.
+async function getSystemPrinters() {
+  if (!printerProbeWindow || printerProbeWindow.isDestroyed()) {
+    printerProbeWindow = new BrowserWindow({
+      show: false,
+      webPreferences: { sandbox: false }
+    });
+    await printerProbeWindow.loadURL('about:blank');
+  }
   try {
-    return await mainWindow.webContents.getPrintersAsync();
+    const printers = await printerProbeWindow.webContents.getPrintersAsync();
+    console.log('rc-get-printers: encontradas', printers.length, 'impresoras');
+    return printers;
   } catch (err) {
+    console.error('getSystemPrinters error:', err);
+    // Si falla, destruimos la ventana probe para forzar una nueva en el
+    // siguiente intento, en vez de quedar atascados con un webContents malo.
+    if (printerProbeWindow && !printerProbeWindow.isDestroyed()) {
+      printerProbeWindow.destroy();
+    }
+    printerProbeWindow = null;
     return [];
   }
+}
+ 
+ipcMain.handle('rc-get-printers', async () => {
+  return await getSystemPrinters();
 });
  
 // El trabajo de impresión real se ejecuta sobre la ventana principal
@@ -301,5 +325,6 @@ app.whenReady().then(() => {
 });
  
 app.on('window-all-closed', () => {
+  if (printerProbeWindow && !printerProbeWindow.isDestroyed()) printerProbeWindow.destroy();
   if (process.platform !== 'darwin') app.quit();
 });
