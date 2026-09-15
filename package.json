@@ -1,6 +1,6 @@
 {
   "name": "redactor-contratos",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Editor de contratos de escritorio (Electron)",
   "main": "main.js",
   "author": "",
@@ -31,6 +31,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "preview-preload.js",
       "renderer/**/*"
     ],
     "publish": {

@@ -4,24 +4,54 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { pathToFileURL } = require('url');
- 
+
 let mainWindow = null;
 let previewWindow = null;
 let printerProbeWindow = null;
 let currentPdfPath = null;
- 
+
+// ---------------------------------------------------------------
+// Logging a archivo (para poder diagnosticar en la app empaquetada,
+// donde no hay terminal ni DevTools accesibles fácilmente).
+// El archivo queda en la carpeta de datos de usuario de la app, p. ej.
+// en Windows: C:\Users\<usuario>\AppData\Roaming\<NombreApp>\debug.log
+// ---------------------------------------------------------------
+const logFilePath = path.join(app.getPath('userData'), 'debug.log');
+
+function writeLog(...parts) {
+  const line = `[${new Date().toISOString()}] ${parts.map(p => {
+    if (p instanceof Error) return p.stack || p.message;
+    if (typeof p === 'object') { try { return JSON.stringify(p); } catch (e) { return String(p); } }
+    return String(p);
+  }).join(' ')}\n`;
+  try {
+    fs.appendFileSync(logFilePath, line);
+  } catch (e) { /* si ni esto funciona, no hay mucho más que hacer */ }
+  // También lo mandamos a consola por si en algún momento hay terminal disponible.
+  console.log(line.trim());
+}
+
+process.on('uncaughtException', (err) => {
+  writeLog('UNCAUGHT EXCEPTION EN MAIN:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  writeLog('UNHANDLED REJECTION EN MAIN:', reason);
+});
+
+writeLog('--- App iniciada. Log en:', logFilePath, '---');
+
 // ---------------------------------------------------------------
 // Auto-actualización (GitHub Releases)
 // ---------------------------------------------------------------
 autoUpdater.autoDownload = false; // descargamos solo cuando el usuario confirma
 autoUpdater.autoInstallOnAppQuit = true;
- 
+
 function sendUpdateStatus(status, data) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update-status', { status, data });
   }
 }
- 
+
 autoUpdater.on('checking-for-update', () => {
   sendUpdateStatus('checking');
 });
@@ -41,7 +71,7 @@ autoUpdater.on('update-downloaded', () => {
 autoUpdater.on('error', (err) => {
   sendUpdateStatus('error', { message: err == null ? 'Error desconocido' : err.message });
 });
- 
+
 ipcMain.handle('rc-check-for-updates', async () => {
   if (!app.isPackaged) {
     // En desarrollo (npm start) no hay instalador que actualizar; evita el error
@@ -55,15 +85,15 @@ ipcMain.handle('rc-check-for-updates', async () => {
     sendUpdateStatus('error', { message: err.message });
   }
 });
- 
+
 ipcMain.handle('rc-install-update-now', () => {
   autoUpdater.quitAndInstall();
 });
- 
+
 // ---------------------------------------------------------------
 // Vista previa de impresión (ventana modal)
 // ---------------------------------------------------------------
- 
+
 // Abre la ventana modal ocupando toda la resolución disponible de la
 // pantalla (se calcula con `screen.getPrimaryDisplay()` y además se
 // maximiza, para cubrir también monitores con distinta densidad/escala).
@@ -73,7 +103,7 @@ function openPreviewWindow() {
     return;
   }
   const { workAreaSize, workArea } = screen.getPrimaryDisplay();
- 
+
   previewWindow = new BrowserWindow({
     width: workAreaSize.width,
     height: workAreaSize.height,
@@ -94,24 +124,38 @@ function openPreviewWindow() {
       sandbox: false
     }
   });
- 
+
   previewWindow.setMenuBarVisibility(false);
   previewWindow.webContents.on('preload-error', (event, preloadPath, error) => {
-    console.error('ERROR EN PRELOAD:', preloadPath, error);
+    writeLog('ERROR EN PRELOAD DE PREVIEW:', preloadPath, error);
   });
- 
+  previewWindow.webContents.on('render-process-gone', (event, details) => {
+    writeLog('PREVIEWWINDOW RENDER-PROCESS-GONE:', details);
+  });
+  previewWindow.webContents.on('unresponsive', () => {
+    writeLog('PREVIEWWINDOW UNRESPONSIVE');
+  });
+
+  // Atajo para abrir DevTools también en la app empaquetada (Ctrl+Shift+I
+  // no funciona sin menú; esto lo fuerza manualmente).
+  previewWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      previewWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+  });
+
   previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
- 
+
   previewWindow.once('ready-to-show', () => {
     previewWindow.maximize();
     previewWindow.show();
   });
- 
+
   previewWindow.on('closed', () => {
     previewWindow = null;
   });
 }
- 
+
 // Genera (o regenera) el PDF de vista previa a partir del contenido
 // actual de la ventana principal, respetando el tamaño de papel y la
 // orientación elegidos. Devuelve la URL file:// del PDF o null si falla.
@@ -125,19 +169,20 @@ async function generatePdfPreview(opts) {
       pageSize: options.pageSize || 'A4',
       margins: { marginType: 'default' }
     });
- 
+
     if (currentPdfPath && fs.existsSync(currentPdfPath)) {
       try { fs.unlinkSync(currentPdfPath); } catch (e) { /* no crítico */ }
     }
     currentPdfPath = path.join(os.tmpdir(), `contrato-preview-${Date.now()}.pdf`);
     fs.writeFileSync(currentPdfPath, pdfBuffer);
+    writeLog('generatePdfPreview OK:', currentPdfPath);
     return pathToFileURL(currentPdfPath).href;
   } catch (err) {
-    console.error('Error generando la vista previa de impresión:', err);
+    writeLog('Error generando la vista previa de impresión:', err);
     return null;
   }
 }
- 
+
 // Genera el PDF inicial (A4, vertical) y abre la ventana modal.
 ipcMain.handle('rc-print', async () => {
   const url = await generatePdfPreview({ pageSize: 'A4', landscape: false });
@@ -145,36 +190,40 @@ ipcMain.handle('rc-print', async () => {
   openPreviewWindow();
   return true;
 });
- 
+
 // Regenera el PDF cuando el usuario cambia tipo de papel u orientación
 // dentro del modal, para que la vista previa refleje el cambio.
 ipcMain.handle('rc-update-preview', async (event, opts) => {
   return await generatePdfPreview(opts);
 });
- 
+
 ipcMain.handle('rc-get-pdf-path', () => {
   if (!currentPdfPath || !fs.existsSync(currentPdfPath)) return null;
   return pathToFileURL(currentPdfPath).href;
 });
- 
+
 // Ventana oculta dedicada solo a consultar impresoras. La separamos del
 // webContents de mainWindow porque printToPDF() repetido (al cambiar papel
 // u orientación en el preview) puede dejar el print backend en mal estado
 // y getPrintersAsync() empieza a devolver [] sin lanzar error.
 async function getSystemPrinters() {
   if (!printerProbeWindow || printerProbeWindow.isDestroyed()) {
+    writeLog('getSystemPrinters: creando printerProbeWindow nueva');
     printerProbeWindow = new BrowserWindow({
       show: false,
       webPreferences: { sandbox: false }
+    });
+    printerProbeWindow.webContents.on('render-process-gone', (event, details) => {
+      writeLog('PRINTERPROBEWINDOW RENDER-PROCESS-GONE:', details);
     });
     await printerProbeWindow.loadURL('about:blank');
   }
   try {
     const printers = await printerProbeWindow.webContents.getPrintersAsync();
-    console.log('rc-get-printers: encontradas', printers.length, 'impresoras');
+    writeLog('rc-get-printers OK: encontradas', printers.length, 'impresoras');
     return printers;
   } catch (err) {
-    console.error('getSystemPrinters error:', err);
+    writeLog('getSystemPrinters ERROR:', err);
     // Si falla, destruimos la ventana probe para forzar una nueva en el
     // siguiente intento, en vez de quedar atascados con un webContents malo.
     if (printerProbeWindow && !printerProbeWindow.isDestroyed()) {
@@ -184,11 +233,11 @@ async function getSystemPrinters() {
     return [];
   }
 }
- 
+
 ipcMain.handle('rc-get-printers', async () => {
   return await getSystemPrinters();
 });
- 
+
 // El trabajo de impresión real se ejecuta sobre la ventana principal
 // (no sobre la vista previa), silencioso y con las opciones elegidas
 // en el modal. Las reglas @media print de index.html se encargan de
@@ -210,7 +259,7 @@ ipcMain.handle('rc-execute-print', (event, opts) => {
     });
   });
 });
- 
+
 ipcMain.handle('rc-save-pdf', async () => {
   if (!currentPdfPath || !fs.existsSync(currentPdfPath)) return { success: false };
   const { canceled, filePath } = await dialog.showSaveDialog(previewWindow, {
@@ -221,14 +270,14 @@ ipcMain.handle('rc-save-pdf', async () => {
   fs.copyFileSync(currentPdfPath, filePath);
   return { success: true, filePath };
 });
- 
+
 ipcMain.handle('rc-close-preview', () => {
   if (previewWindow && !previewWindow.isDestroyed()) previewWindow.close();
 });
- 
+
 function createWindow() {
   const { workAreaSize, workArea } = screen.getPrimaryDisplay();
- 
+
   mainWindow = new BrowserWindow({
     width: workAreaSize.width,
     height: workAreaSize.height,
@@ -249,16 +298,34 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false
   });
- 
+
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
- 
+
+  // Detecta si el renderer de la ventana principal se cae o deja de
+  // responder. Si esto ocurre, printToPDF y getPrintersAsync fallarán
+  // silenciosamente porque dependen de este webContents.
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    writeLog('MAINWINDOW RENDER-PROCESS-GONE:', details);
+  });
+  mainWindow.webContents.on('unresponsive', () => {
+    writeLog('MAINWINDOW UNRESPONSIVE');
+  });
+  mainWindow.webContents.on('responsive', () => {
+    writeLog('MAINWINDOW VOLVIO A RESPONDER');
+  });
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+  });
+
   // Muestra la ventana solo cuando el contenido ya está listo (evita el "flash" blanco)
   // y la maximiza para ocupar toda la resolución detectada de la pantalla.
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize();
     mainWindow.show();
   });
- 
+
   // Abre enlaces externos (http/https) en el navegador del sistema, no dentro de la app
   // Permite ventanas internas (diálogos de impresión, etc.) bloqueando solo URLs externas
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -269,7 +336,7 @@ function createWindow() {
     // Permite diálogos internos (print, etc.) que no tienen URL o tienen about:blank
     return { action: 'allow' };
   });
- 
+
   // Menú mínimo (con recargar y devtools solo en desarrollo)
   const isDev = !app.isPackaged;
   const template = [
@@ -315,15 +382,15 @@ function createWindow() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
- 
+
 app.whenReady().then(() => {
   createWindow();
- 
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
- 
+
 app.on('window-all-closed', () => {
   if (printerProbeWindow && !printerProbeWindow.isDestroyed()) printerProbeWindow.destroy();
   if (process.platform !== 'darwin') app.quit();
