@@ -10,6 +10,11 @@ let previewWindow = null;
 let printerProbeWindow = null;
 let currentPdfPath = null;
 
+// Recuerda las últimas opciones de papel/orientación usadas, para que el
+// modal de vista previa se abra ya con el mismo tamaño que eligió el
+// usuario en el editor principal (en vez de reiniciar siempre en A4).
+let currentPrintOptions = { pageSize: 'A4', landscape: false };
+
 // ---------------------------------------------------------------
 // Logging a archivo (para poder diagnosticar en la app empaquetada,
 // donde no hay terminal ni DevTools accesibles fácilmente).
@@ -89,6 +94,36 @@ ipcMain.handle('rc-check-for-updates', async () => {
 ipcMain.handle('rc-install-update-now', () => {
   autoUpdater.quitAndInstall();
 });
+
+// ---------------------------------------------------------------
+// Tamaños de página en micrones (anchura x altura, en orientación
+// vertical/portrait). Se usan como respaldo cuando el nombre de papel
+// como string ("A4", "Legal", etc.) no es respetado por el driver de la
+// impresora en modo de impresión silenciosa (bug conocido de Electron/
+// Chromium en Windows: el string de pageSize a veces se ignora y cae al
+// tamaño predeterminado del driver, normalmente Carta/Letter).
+// Los valores están en micrones, tal como los espera Electron cuando
+// pageSize es un objeto {width, height}.
+// ---------------------------------------------------------------
+const PAGE_SIZES_MICRONS = {
+  A3: { width: 297000, height: 420000 },
+  A4: { width: 210000, height: 297000 },
+  A5: { width: 148000, height: 210000 },
+  Legal: { width: 215900, height: 355600 },
+  Letter: { width: 215900, height: 279400 },
+  Tabloid: { width: 279400, height: 431800 }
+};
+
+// Convierte el nombre de papel elegido por el usuario en el objeto de
+// medidas exactas que se le pasa a webContents.print(). Si el usuario
+// pasa landscape:true, invertimos ancho/alto aquí mismo y llamamos a
+// print() con landscape:false, para evitar que Electron intente rotar
+// dos veces (una vez nosotros, otra vez el propio flag landscape).
+function resolvePrintPageSize(pageSize, landscape) {
+  const size = PAGE_SIZES_MICRONS[pageSize];
+  if (!size) return pageSize; // nombre no reconocido: se deja tal cual
+  return landscape ? { width: size.height, height: size.width } : { width: size.width, height: size.height };
+}
 
 // ---------------------------------------------------------------
 // Vista previa de impresión (ventana modal)
@@ -186,7 +221,7 @@ async function generatePdfPreview(opts) {
     }
     currentPdfPath = path.join(os.tmpdir(), `contrato-preview-${Date.now()}.pdf`);
     fs.writeFileSync(currentPdfPath, pdfBuffer);
-    writeLog('generatePdfPreview OK:', currentPdfPath);
+    writeLog('generatePdfPreview OK:', currentPdfPath, 'opciones:', options);
     return pathToFileURL(currentPdfPath).href;
   } catch (err) {
     writeLog('Error generando la vista previa de impresión:', err);
@@ -198,9 +233,19 @@ async function generatePdfPreview(opts) {
   }
 }
 
-// Genera el PDF inicial (A4, vertical) y abre la ventana modal.
-ipcMain.handle('rc-print', async () => {
-  const url = await generatePdfPreview({ pageSize: 'A4', landscape: false });
+// Genera el PDF inicial y abre la ventana modal, usando el tamaño de
+// papel y la orientación que el usuario haya elegido en el editor
+// principal (index.html). Si no llega nada, se usa A4 vertical como
+// valor por defecto.
+ipcMain.handle('rc-print', async (event, opts) => {
+  const options = opts || {};
+  currentPrintOptions = {
+    pageSize: options.pageSize || 'A4',
+    landscape: !!options.landscape
+  };
+  writeLog('rc-print opciones recibidas del editor:', currentPrintOptions);
+
+  const url = await generatePdfPreview(currentPrintOptions);
   if (!url) return false;
   openPreviewWindow();
   return true;
@@ -209,13 +254,23 @@ ipcMain.handle('rc-print', async () => {
 // Regenera el PDF cuando el usuario cambia tipo de papel u orientación
 // dentro del modal, para que la vista previa refleje el cambio.
 ipcMain.handle('rc-update-preview', async (event, opts) => {
-  return await generatePdfPreview(opts);
+  const options = opts || {};
+  currentPrintOptions = {
+    pageSize: options.pageSize || 'A4',
+    landscape: !!options.landscape
+  };
+  return await generatePdfPreview(currentPrintOptions);
 });
 
 ipcMain.handle('rc-get-pdf-path', () => {
   if (!currentPdfPath || !fs.existsSync(currentPdfPath)) return null;
   return pathToFileURL(currentPdfPath).href;
 });
+
+// Permite que preview.html, al abrirse, sincronice sus controles
+// (tamaño de papel / orientación) con lo que ya se eligió en el editor,
+// en vez de reiniciar siempre en A4 vertical.
+ipcMain.handle('rc-get-print-options', () => currentPrintOptions);
 
 // Ventana oculta dedicada solo a consultar impresoras. La separamos del
 // webContents de mainWindow porque printToPDF() repetido (al cambiar papel
@@ -257,7 +312,18 @@ ipcMain.handle('rc-get-printers', async () => {
 // (no sobre la vista previa), silencioso y con las opciones elegidas
 // en el modal. Las reglas @media print de index.html se encargan de
 // ocultar la interfaz y mostrar solo el contrato.
+//
+// IMPORTANTE sobre el tamaño de papel: en impresión silenciosa
+// (silent:true) en Windows, Electron/Chromium a veces IGNORA el nombre
+// de papel como string ("A4", "Legal", etc.) si el driver de la
+// impresora no lo reconoce exactamente igual, y cae de vuelta al
+// tamaño predeterminado del driver (casi siempre Carta/Letter). Para
+// evitar esto, convertimos el nombre a medidas exactas en micrones
+// (resolvePrintPageSize) antes de pasarlo a print(). Si el nombre no es
+// uno de los reconocidos, se manda el string tal cual como respaldo.
 ipcMain.handle('rc-execute-print', async (event, opts) => {
+  writeLog('rc-execute-print opciones recibidas:', opts);
+
   try {
     await setMainWindowFieldsForOutput(true);
   } catch (err) {
@@ -276,16 +342,25 @@ ipcMain.handle('rc-execute-print', async (event, opts) => {
       return;
     }
     try {
+      const resolvedPageSize = resolvePrintPageSize(opts.pageSize || 'A4', !!opts.landscape);
+      // Si resolvedPageSize es un objeto {width,height} ya viene con la
+      // orientación aplicada, así que print() se llama con landscape:false
+      // para que Chromium no intente rotarlo una segunda vez. Si es un
+      // string (nombre no reconocido), se respeta el flag landscape normal.
+      const isResolvedObject = typeof resolvedPageSize === 'object';
+      writeLog('rc-execute-print pageSize resuelto:', resolvedPageSize, 'esObjeto:', isResolvedObject);
+
       mainWindow.webContents.print({
         silent: true, // clave: evita el diálogo nativo del SO
         deviceName: opts.deviceName,
         copies: Math.max(1, parseInt(opts.copies, 10) || 1),
         color: opts.color !== false,
-        landscape: !!opts.landscape,
+        landscape: isResolvedObject ? false : !!opts.landscape,
         printBackground: opts.printBackground !== false,
-        pageSize: opts.pageSize || 'A4',
+        pageSize: resolvedPageSize,
         margins: { marginType: opts.marginsType || 'default' }
       }, (success, errorType) => {
+        writeLog('rc-execute-print resultado:', success, errorType);
         restoreAndResolve({ success, errorType: errorType || null });
       });
     } catch (err) {

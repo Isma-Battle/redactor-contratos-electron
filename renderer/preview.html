@@ -445,6 +445,23 @@
       window.previewAPI.onThemeUpdated((theme) => applyTheme(theme));
     }
 
+    // Sincroniza el tamaño de papel y la orientación con lo que ya se
+    // eligió en el editor principal (antes este modal siempre reiniciaba
+    // en A4 vertical, sin importar lo que se hubiera seleccionado allí).
+    // El PDF que se muestra abajo ya fue generado con esas opciones, así
+    // que solo hace falta reflejarlas en los controles, sin regenerarlo.
+    try {
+      if (window.previewAPI.getPrintOptions) {
+        const opts = await window.previewAPI.getPrintOptions();
+        if (opts) {
+          if (opts.pageSize && paperSelect.querySelector(`option[value="${opts.pageSize}"]`)) {
+            paperSelect.value = opts.pageSize;
+          }
+          landscapeCheckbox.checked = !!opts.landscape;
+        }
+      }
+    } catch (err) { /* se queda con los valores por defecto (A4, vertical) */ }
+
     try {
       const url = await window.previewAPI.getPdfUrl();
       if (url) {

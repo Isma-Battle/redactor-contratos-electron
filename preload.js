@@ -4,9 +4,9 @@
 // funcionan sin ayuda de Node. Lo que exponemos aquí es la API de
 // actualizaciones (botón "Buscar actualizaciones") y la API de
 // impresión, que genera el PDF de vista previa y abre el modal.
- 
+
 const { contextBridge, ipcRenderer } = require('electron');
- 
+
 contextBridge.exposeInMainWorld('rcUpdater', {
   check: () => ipcRenderer.invoke('rc-check-for-updates'),
   installNow: () => ipcRenderer.invoke('rc-install-update-now'),
@@ -14,9 +14,11 @@ contextBridge.exposeInMainWorld('rcUpdater', {
     ipcRenderer.on('update-status', (_event, payload) => callback(payload));
   }
 });
- 
+
 contextBridge.exposeInMainWorld('rcPrint', {
   // Genera el PDF de vista previa a partir del contenido actual del
   // editor y abre la ventana modal de impresión. Devuelve true/false.
-  print: () => ipcRenderer.invoke('rc-print')
+  // opts admite { pageSize, landscape } elegidos en el editor principal;
+  // si se omiten, main.js usa A4 vertical por defecto.
+  print: (opts) => ipcRenderer.invoke('rc-print', opts)
 });
