@@ -1,6 +1,6 @@
 {
   "name": "redactor-contratos",
-  "version": "1.0.7",
+  "version": "1.0.10",
   "description": "Editor de contratos de escritorio (Electron)",
   "main": "main.js",
   "author": "",

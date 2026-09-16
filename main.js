@@ -159,10 +159,21 @@ function openPreviewWindow() {
 // Genera (o regenera) el PDF de vista previa a partir del contenido
 // actual de la ventana principal, respetando el tamaño de papel y la
 // orientación elegidos. Devuelve la URL file:// del PDF o null si falla.
+async function setMainWindowFieldsForOutput(plainText) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const fieldScript = plainText
+    ? "document.querySelectorAll('.campo').forEach((span) => { span.textContent = (span.getAttribute('data-value') || '').trim(); });"
+    : "document.querySelectorAll('.campo').forEach((span) => { const value = (span.getAttribute('data-value') || '').trim(); const label = span.getAttribute('data-label') || ''; span.textContent = value || '[' + label + ']'; });";
+  await mainWindow.webContents.executeJavaScript(`(() => { ${fieldScript} })()`, true);
+}
+
 async function generatePdfPreview(opts) {
   if (!mainWindow || mainWindow.isDestroyed()) return null;
   const options = opts || {};
+  let fieldsPrepared = false;
   try {
+    await setMainWindowFieldsForOutput(true);
+    fieldsPrepared = true;
     const pdfBuffer = await mainWindow.webContents.printToPDF({
       printBackground: true,
       landscape: !!options.landscape,
@@ -180,6 +191,10 @@ async function generatePdfPreview(opts) {
   } catch (err) {
     writeLog('Error generando la vista previa de impresión:', err);
     return null;
+  } finally {
+    if (fieldsPrepared) {
+      try { await setMainWindowFieldsForOutput(false); } catch (err) { writeLog('Error restaurando campos:', err); }
+    }
   }
 }
 
@@ -242,21 +257,41 @@ ipcMain.handle('rc-get-printers', async () => {
 // (no sobre la vista previa), silencioso y con las opciones elegidas
 // en el modal. Las reglas @media print de index.html se encargan de
 // ocultar la interfaz y mostrar solo el contrato.
-ipcMain.handle('rc-execute-print', (event, opts) => {
+ipcMain.handle('rc-execute-print', async (event, opts) => {
+  try {
+    await setMainWindowFieldsForOutput(true);
+  } catch (err) {
+    writeLog('Error preparando campos para imprimir:', err);
+    return { success: false, errorType: 'prepare-fields-failed' };
+  }
+
   return new Promise((resolve) => {
-    if (!mainWindow || mainWindow.isDestroyed()) { resolve({ success: false }); return; }
-    mainWindow.webContents.print({
-      silent: true, // clave: evita el diálogo nativo del SO
-      deviceName: opts.deviceName,
-      copies: Math.max(1, parseInt(opts.copies, 10) || 1),
-      color: opts.color !== false,
-      landscape: !!opts.landscape,
-      printBackground: opts.printBackground !== false,
-      pageSize: opts.pageSize || 'A4',
-      margins: { marginType: opts.marginsType || 'default' }
-    }, (success, errorType) => {
-      resolve({ success, errorType: errorType || null });
-    });
+    const restoreAndResolve = (result) => {
+      setMainWindowFieldsForOutput(false)
+        .catch((err) => writeLog('Error restaurando campos tras imprimir:', err))
+        .finally(() => resolve(result));
+    };
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      restoreAndResolve({ success: false });
+      return;
+    }
+    try {
+      mainWindow.webContents.print({
+        silent: true, // clave: evita el diálogo nativo del SO
+        deviceName: opts.deviceName,
+        copies: Math.max(1, parseInt(opts.copies, 10) || 1),
+        color: opts.color !== false,
+        landscape: !!opts.landscape,
+        printBackground: opts.printBackground !== false,
+        pageSize: opts.pageSize || 'A4',
+        margins: { marginType: opts.marginsType || 'default' }
+      }, (success, errorType) => {
+        restoreAndResolve({ success, errorType: errorType || null });
+      });
+    } catch (err) {
+      writeLog('Error ejecutando impresión:', err);
+      restoreAndResolve({ success: false, errorType: 'print-failed' });
+    }
   });
 });
 

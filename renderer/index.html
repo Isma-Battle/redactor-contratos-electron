@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redactor de Contratos v1.0.7</title>
+<title>Redactor de Contratos v1.0.10</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -181,10 +181,58 @@
     cursor:pointer;
     transition:transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
   }
-  @media print {
-  .topbar, .toolbar-strip, .sidebar, .img-toolbar, .img-del, .img-resize-handle { display: none !important; }
-  .paper { box-shadow: none; margin: 0; padding: 0; }
+ @media print {
+  .topbar, .toolbar-strip, .editor-formatbar, .editor-footer, .sidebar, .img-toolbar, .img-del, .img-resize-handle { display: none !important; }
+
+  html, body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #1a1a1a !important;
   }
+
+  .layout {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .page-wrap {
+    display: block !important;
+  }
+
+  .paper {
+    background: #fff !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    color: #1a1a1a !important;
+  }
+
+  .campo, .campo:hover, .campo.empty-field {
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: inherit !important;
+    padding: 0 !important;
+    cursor: inherit !important;
+    font: inherit !important;
+    font-style: inherit !important;
+    font-weight: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: inherit !important;
+    text-decoration: inherit !important;
+    white-space: inherit !important;
+  }
+
+  .img-wrap.selected { outline: none !important; }
+}
   button:active{transform:scale(0.97);}
   button:disabled{opacity:0.45;cursor:not-allowed;}
 
@@ -642,6 +690,165 @@
 
   ::selection{background:#F1D999;}
 
+  /* ---------- Lenguaje visual compartido con la vista previa ---------- */
+  :root{
+    --bg:#12151B;
+    --surface:#1B1F28;
+    --surface-raised:#20242E;
+    --border:#2B303B;
+    --border-strong:#3B424F;
+    --text:#E7EAF0;
+    --text-muted:#99A1B0;
+    --text-faint:#6B7280;
+    --accent:#5F8DFB;
+    --accent-hover:#7DA1FC;
+    --accent-contrast:#0B111F;
+    --success:#33C77B;
+    --danger:#FF6B6B;
+    --focus:rgba(95,141,251,0.35);
+    --paper:#FCFCFA;
+    --paper-shadow:rgba(0,0,0,0.28);
+    --ink:var(--text);
+    --ink-soft:var(--text-muted);
+    --muted:var(--text-muted);
+    --line:var(--border);
+    --panel:var(--surface);
+    --highlight:rgba(95,141,251,0.18);
+    --highlight-border:var(--accent);
+    --ok:var(--success);
+    --wine:var(--danger);
+    --chrome-bg:var(--bg);
+    --chrome-grad-1:none;
+    --chrome-grad-2:none;
+    --chrome-text:var(--text);
+    --chrome-text-muted:var(--text-muted);
+    --chrome-border:var(--border);
+    --ghost-border:var(--border-strong);
+    --ghost-text:var(--text);
+    --ghost-hover-bg:var(--surface-raised);
+    --basename-bg:var(--surface-raised);
+    --basename-border:var(--border-strong);
+    --basename-text:var(--text);
+    --basename-placeholder:var(--text-faint);
+  }
+
+  html[data-theme="light"]{
+    --bg:#F4F5F7;
+    --surface:#FFFFFF;
+    --surface-raised:#FFFFFF;
+    --border:#E3E6EB;
+    --border-strong:#C9CEDA;
+    --text:#1B2233;
+    --text-muted:#667085;
+    --text-faint:#8A93A6;
+    --accent:#3163E8;
+    --accent-hover:#274FC4;
+    --accent-contrast:#FFFFFF;
+    --success:#158452;
+    --danger:#D6362C;
+    --focus:rgba(49,99,232,0.28);
+    --paper:#FCFCFA;
+    --paper-shadow:rgba(27,34,51,0.14);
+    --ink:var(--text);
+    --ink-soft:var(--text-muted);
+    --muted:var(--text-muted);
+    --line:var(--border);
+    --panel:var(--surface);
+    --highlight:rgba(49,99,232,0.10);
+    --highlight-border:var(--accent);
+    --ok:var(--success);
+    --wine:var(--danger);
+    --chrome-bg:var(--bg);
+    --chrome-text:var(--text);
+    --chrome-text-muted:var(--text-muted);
+    --chrome-border:var(--border);
+    --ghost-border:var(--border-strong);
+    --ghost-text:var(--text);
+    --ghost-hover-bg:#F4F6FA;
+    --basename-bg:var(--surface);
+    --basename-border:var(--border-strong);
+    --basename-text:var(--text);
+    --basename-placeholder:var(--text-faint);
+  }
+
+  body{background:var(--bg); color:var(--text);}
+  .topbar{
+    min-height:78px;
+    padding:14px 22px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    box-shadow:0 2px 12px rgba(27,34,51,0.06);
+  }
+  .brand{align-items:center; gap:10px;}
+  .brand .mark{
+    width:42px;height:42px;border-radius:11px;
+    background:var(--accent);
+    box-shadow:0 6px 14px rgba(49,99,232,0.24);
+    position:relative;
+  }
+  .brand .mark::after{content:'▤'; color:#fff; font-size:25px; position:absolute; inset:4px 0 0; text-align:center;}
+  .brand h1{font-family:'IBM Plex Sans',sans-serif; font-size:1rem; font-weight:700; color:var(--text);}
+  .brand .sub{color:var(--text-muted); font-size:0.72rem;}
+  .topbar-actions{gap:8px;}
+  button{border-radius:8px; padding:9px 13px; font-weight:600;}
+  .btn-ghost{border-color:var(--border-strong); color:var(--text); background:var(--surface);}
+  .btn-ghost:hover:not(:disabled){background:var(--ghost-hover-bg); border-color:var(--accent);}
+  .btn-brass{background:var(--accent); color:var(--accent-contrast);}
+  .btn-brass:hover:not(:disabled){background:var(--accent-hover); color:var(--accent-contrast);}
+  .btn-wine{background:var(--danger); color:#fff;}
+  .btn-wine:hover:not(:disabled){background:#B72C25;}
+  .btn-panel{background:var(--surface); border-color:var(--border); color:var(--text);}
+  .btn-panel:hover:not(:disabled){background:var(--surface-raised); border-color:var(--accent); color:var(--text);}
+  input[type="text"].base-name{background:var(--surface); color:var(--text); border-color:var(--border-strong); width:145px;}
+
+  .layout{grid-template-columns:280px minmax(480px,1fr) 330px; gap:12px; max-width:1500px; padding:22px 16px 36px;}
+  .sidebar{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px; box-shadow:0 2px 8px rgba(27,34,51,0.04);}
+  .sidebar h2{font-family:'IBM Plex Sans',sans-serif; font-size:0.9rem; font-weight:700; color:var(--text);}
+  .sidebar .sidebar-sub{color:var(--text-muted); line-height:1.45;}
+  .sidebar-section + .sidebar-section{border-color:var(--border);}
+  .sidebar-head .btn-refresh{background:var(--surface); border-color:var(--border-strong); color:var(--accent);}
+  .sidebar-head .btn-refresh:hover:not(:disabled){background:var(--accent); color:#fff;}
+  .search-input{background:var(--surface-raised); color:var(--text); border-color:var(--border); border-radius:8px;}
+  .search-input:focus{outline:3px solid var(--focus);}
+  .field-item,.img-item{background:var(--surface-raised); border-color:var(--border);}
+  .field-item .f-label{color:var(--accent);}
+  .field-item .f-value,.no-fields{color:var(--text-muted);}
+  .status-block{border-color:var(--border); color:var(--text-muted);}
+  .toolbar-strip{max-width:100%; margin-bottom:12px; padding:0 2px;}
+  .toolbar-strip .left-group{gap:8px;}
+  .toolbar-strip .hint{color:var(--text-muted); font-size:0.72rem;}
+  .paper{max-width:100%; min-height:calc(100vh - 190px); padding:60px 66px; border:1px solid var(--border); border-radius:8px; color:#202633; box-shadow:0 14px 34px var(--paper-shadow);}
+  .paper:focus{box-shadow:0 14px 34px var(--paper-shadow), 0 0 0 3px var(--focus);}
+  .campo{background:var(--highlight); border-color:var(--highlight-border); color:var(--accent);}
+  .campo:hover{background:rgba(49,99,232,0.2);}
+  .img-toolbar{background:var(--surface-raised); border:1px solid var(--border-strong);}
+  .img-toolbar button{color:var(--text);}
+  .img-toolbar button.active{background:var(--accent); color:#fff;}
+  .modal{background:var(--surface); border:1px solid var(--border);}
+  .modal h3,.modal label{color:var(--text);}
+  .modal .modal-sub,.load-panel .load-note{color:var(--text-muted);}
+  .modal input[type="text"],.modal textarea,.load-rich{background:var(--surface-raised); color:var(--text); border-color:var(--border-strong);}
+  .license-gate{background:var(--bg);}
+
+  @media (max-width:1100px){
+    .layout{grid-template-columns:1fr 1fr;}
+    .page-wrap{grid-column:1 / -1; grid-row:1;}
+    #filesSidebar{grid-column:1; grid-row:2;}
+    .layout > .sidebar:last-child{grid-column:2; grid-row:2;}
+  }
+  @media (max-width:700px){
+    .topbar{align-items:flex-start; padding:12px 14px;}
+    .brand{width:100%;}
+    .brand .sub{display:none;}
+    .topbar-actions{width:100%;}
+    .topbar-actions > *{flex:1; min-width:0;}
+    .topbar-actions .update-toggle span:last-child,.topbar-actions .theme-toggle span:last-child{display:none;}
+    .layout{display:flex; flex-direction:column; padding:12px;}
+    .page-wrap{order:-1;}
+    .paper{min-height:620px; padding:34px 24px;}
+    .toolbar-strip .hint{width:100%;}
+  }
+
   /* ---------- Pantalla de activación de licencia ---------- */
   .license-gate{
     position:fixed;
@@ -697,13 +904,168 @@
   }
   .license-status.err{color:var(--wine);}
   .license-status.ok{color:var(--ok);}
+
+  /* ---------- Composición del editor ---------- */
+  .brand h1::after{content:'  v1.0.7'; color:var(--text-muted); font-size:.8em; font-weight:500;}
+  .topbar-actions .update-toggle{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    height:40px;
+    padding:0 12px;
+    white-space:nowrap;
+  }
+  .topbar-actions .update-toggle .icon{color:var(--accent); font-size:1.05rem;}
+  .topbar-actions .update-toggle:hover:not(:disabled){color:var(--accent);}
+  .topbar-actions .theme-toggle{width:88px; justify-content:center; padding-inline:8px;}
+  .topbar-actions .theme-toggle .icon{font-size:1.15rem;}
+  .topbar-actions .base-name{width:248px; height:40px; padding-left:38px;}
+  .topbar-actions .base-name::placeholder{color:var(--text-muted);}
+  .topbar-actions .base-name{background:var(--surface-raised);}
+  .topbar-actions #btnChooseFolder{position:relative; width:auto; overflow:visible; white-space:nowrap; font-size:.85rem; padding:0 13px; height:40px; display:inline-flex; align-items:center; gap:7px;}
+  .topbar-actions #btnChooseFolder::before{content:'▱'; font-size:1.1rem;}
+  .topbar-actions #btnSaveNow{height:40px; padding-inline:18px;}
+  .editor-formatbar{
+    display:flex; align-items:center; gap:3px; width:100%; height:50px; padding:7px 12px;
+    border:1px solid var(--border); border-bottom:0; border-radius:9px 9px 0 0;
+    background:var(--surface); box-shadow:0 2px 8px rgba(27,34,51,.04);
+  }
+  .editor-formatbar button{width:31px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text); font-size:.98rem;}
+  .editor-formatbar button:hover:not(:disabled),.editor-formatbar button.active{background:var(--highlight); color:var(--accent);}
+  .editor-formatbar .format-separator{height:24px; width:1px; background:var(--border); margin:0 7px;}
+  .editor-formatbar select{height:32px; border:0; background:transparent; color:var(--text); padding:0 7px; font:500 .8rem 'IBM Plex Sans',sans-serif;}
+  .editor-formatbar select:focus{outline:2px solid var(--focus); border-radius:4px;}
+  .format-color{position:relative; display:grid; place-items:center; width:31px; height:32px; border-radius:6px; cursor:pointer; color:var(--text); font-weight:700; font-size:.98rem;}
+  .format-color:hover{background:var(--highlight); color:var(--accent);}
+  .format-color::after{content:''; position:absolute; bottom:4px; width:16px; height:3px; border-radius:2px; background:var(--format-color,#3163E8);}
+  .format-color input{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;}
+  .page-wrap .paper{border-radius:0 0 8px 8px;}
+  .editor-footer{display:flex; align-items:center; justify-content:space-between; width:100%; padding:11px 15px; margin-top:8px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text-muted); font-size:.72rem;}
+  .editor-footer .footer-tip{display:flex; align-items:center; gap:8px;}
+  .editor-footer .footer-tip strong{display:grid; place-items:center; width:20px; height:20px; border:2px solid var(--accent); border-radius:50%; color:var(--accent); font-size:.7rem;}
+  .zoom-control{display:flex; align-items:center; gap:14px; padding:4px 8px; border:1px solid var(--border); border-radius:18px; background:var(--surface-raised); color:var(--text);}
+  .zoom-control button{width:20px; height:22px; padding:0; color:var(--accent); background:transparent; border:0; font-size:1rem;}
+  .zoom-control button:hover{background:var(--highlight);}
+  .panel-heading{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .panel-heading::after{
+    content:'';
+    width:7px;
+    height:7px;
+    flex:0 0 7px;
+    border-right:2px solid var(--accent);
+    border-bottom:2px solid var(--accent);
+    transform:rotate(225deg) translate(-1px,-1px);
+    transition:transform .16s ease;
+  }
+  .sidebar-section.collapsed > :not(.panel-heading){display:none;}
+  .sidebar-section.collapsed .panel-heading::after{transform:rotate(45deg) translate(-1px,-1px);}
+  #templatesList .field-item,.sidebar #fieldsList .field-item{padding:12px;}
+  #templatesList .field-item::before{content:'▣'; float:left; margin-right:10px; color:var(--accent); font-size:1.35rem;}
+  #fieldsList::before,#imagesList::before{content:attr(data-summary); display:block; padding:10px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:9px; color:var(--accent); font-size:.78rem; font-weight:600;}
+  #imagesList::before{color:var(--text-muted);}
+  @media (max-width:1100px){.topbar-actions .base-name{width:180px;}}
+  @media (max-width:700px){.topbar-actions #btnChooseFolder{display:none;}.editor-formatbar{overflow-x:auto;}.editor-footer .footer-tip{max-width:65%;}}
+
+  /* ---------- Scrollbars y activacion con el lenguaje de la app ---------- */
+  :root{
+    --scrollbar-track:#11151C;
+    --scrollbar-thumb:#46526A;
+    --scrollbar-thumb-hover:#5F8DFB;
+    --scrollbar-border:#11151C;
+  }
+  html[data-theme="light"]{
+    --scrollbar-track:#EEF1F6;
+    --scrollbar-thumb:#B7C0D0;
+    --scrollbar-thumb-hover:#3163E8;
+    --scrollbar-border:#EEF1F6;
+  }
+  html, body, *{
+    scrollbar-width:thin;
+    scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar{width:10px;height:10px;}
+  *::-webkit-scrollbar-track{background:var(--scrollbar-track);}
+  *::-webkit-scrollbar-thumb{
+    background:var(--scrollbar-thumb);
+    border:2px solid var(--scrollbar-border);
+    border-radius:8px;
+  }
+  *::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
+  *::-webkit-scrollbar-corner{background:var(--scrollbar-track);}
+  .sidebar, .load-rich, .paper, #folderFilesList, .modal, .license-gate{
+    scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  .sidebar::-webkit-scrollbar-track, .load-rich::-webkit-scrollbar-track,
+  .paper::-webkit-scrollbar-track, #folderFilesList::-webkit-scrollbar-track,
+  .modal::-webkit-scrollbar-track, .license-gate::-webkit-scrollbar-track{
+    background:var(--scrollbar-track);
+  }
+  .sidebar::-webkit-scrollbar-thumb, .load-rich::-webkit-scrollbar-thumb,
+  .paper::-webkit-scrollbar-thumb, #folderFilesList::-webkit-scrollbar-thumb,
+  .modal::-webkit-scrollbar-thumb, .license-gate::-webkit-scrollbar-thumb{
+    background:var(--scrollbar-thumb);
+    border-color:var(--scrollbar-border);
+  }
+  .sidebar::-webkit-scrollbar-thumb:hover, .load-rich::-webkit-scrollbar-thumb:hover,
+  .paper::-webkit-scrollbar-thumb:hover, #folderFilesList::-webkit-scrollbar-thumb:hover,
+  .modal::-webkit-scrollbar-thumb:hover, .license-gate::-webkit-scrollbar-thumb:hover{
+    background:var(--scrollbar-thumb-hover);
+  }
+  .license-gate{
+    background:var(--bg);
+    background-image:linear-gradient(135deg, rgba(95,141,251,.10), transparent 46%), linear-gradient(315deg, rgba(51,199,123,.06), transparent 42%);
+    color:var(--text);
+    overflow:auto;
+  }
+  .license-card{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    box-shadow:0 24px 60px rgba(11,17,31,.22), 0 2px 8px rgba(11,17,31,.08);
+    padding:34px 32px 30px;
+    max-width:400px;
+  }
+  .license-card::before{
+    content:'▤';
+    display:grid;
+    place-items:center;
+    width:48px;
+    height:48px;
+    margin:0 auto 18px;
+    border-radius:12px;
+    background:var(--accent);
+    color:#fff;
+    font-size:28px;
+    box-shadow:0 8px 18px rgba(49,99,232,.25);
+  }
+  .license-card h2{
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:1.18rem;
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .license-card p{color:var(--text-muted); margin-bottom:22px;}
+  .license-card input[type="text"]{
+    background:var(--surface-raised);
+    color:var(--text);
+    border:1px solid var(--border-strong);
+    border-radius:8px;
+    height:42px;
+    margin-bottom:12px;
+  }
+  .license-card input[type="text"]::placeholder{color:var(--text-faint);}
+  .license-card input[type="text"]:focus{outline:3px solid var(--focus); border-color:var(--accent);}
+  .license-card button{height:42px; border-radius:8px;}
+  .license-status{color:var(--text-muted);}
 </style>
 </head>
 <body>
 <div class="license-gate" id="licenseGate">
   <div class="license-card">
     <h2>Activar Redactor de Contratos</h2>
-    <p>Escribe la clave de licencia que te entregaron para usar este programa en este equipo. Necesita conexión a internet para verificarse.</p>
+    <p>Introduce tu clave de licencia.</p>
     <input type="text" id="licenseKeyInput" placeholder="Clave de licencia" autocomplete="off">
     <button class="btn-brass" id="licenseActivateBtn">Activar</button>
     <div class="license-status" id="licenseGateStatus"></div>
@@ -814,7 +1176,7 @@
     <div>
       <h1>Redactor de Contratos</h1>
     </div>
-    <span class="sub">edita, marca campos, incrusta imágenes, guarda versiones</span>
+    <span class="sub">Edita y guarda contratos</span>
   </div>
   <div class="topbar-actions">
     <button class="btn-ghost update-toggle" id="btnCheckUpdates" title="Buscar nuevas versiones">
@@ -823,8 +1185,8 @@
     <button class="btn-ghost theme-toggle" id="btnThemeToggle" title="Cambiar entre tema claro y oscuro">
       <span class="icon" id="themeToggleIcon">☾</span><span id="themeToggleLabel">Oscuro</span>
     </button>
-    <input type="text" class="base-name" id="baseName" placeholder="nombre base" value="contrato">
-    <button class="btn-ghost" id="btnChooseFolder">Elegir carpeta de guardado</button>
+    <input type="text" class="base-name" id="baseName" placeholder="C:/Documentos/Contratos_Empresa/Actuales/" value="contrato">
+    <button class="btn-ghost" id="btnChooseFolder">Seleccionar carpeta</button>
     <button class="btn-brass" id="btnSaveNow">Guardar versión .doc</button>
   </div>
 </div>
@@ -835,13 +1197,13 @@
       <div class="sidebar-head">
         <div>
           <h2>Archivos de la carpeta</h2>
-          <div class="sidebar-sub">Versiones .doc guardadas en la carpeta elegida. Ábrelas para seguir editando sus campos o para imprimirlas.</div>
+          <div class="sidebar-sub">Versiones guardadas</div>
         </div>
         <button class="btn-panel btn-refresh" id="btnRefreshFolderFiles" title="Actualizar lista"><span class="icon">↻</span> Actualizar</button>
       </div>
       <input type="text" id="folderFilesSearch" class="search-input" placeholder="Buscar por nombre..." disabled>
       <div id="folderFilesList">
-        <div class="no-fields">Elige una carpeta de guardado (arriba) para ver aquí las versiones guardadas.</div>
+        <div class="no-fields">Selecciona una carpeta</div>
       </div>
     </div>
   </div>
@@ -855,34 +1217,60 @@
         <button class="btn-panel" id="btnSaveTemplate" disabled>Guardar como modelo</button>
         <button class="btn-panel" id="btnPrint" disabled>Imprimir</button>
       </div>
-      <span class="hint">Haz clic en una imagen para redimensionarla, elegir si afecta al texto o moverla libremente</span>
+      <span class="hint">Selecciona una imagen para editarla</span>
+    </div>
+
+    <div class="editor-formatbar" id="editorFormatbar" aria-label="Formato del documento">
+      <button type="button" data-command="undo" title="Deshacer">↶</button>
+      <button type="button" data-command="redo" title="Rehacer">↷</button>
+      <span class="format-separator"></span>
+      <button type="button" data-command="bold" title="Negrita"><strong>B</strong></button>
+      <button type="button" data-command="italic" title="Cursiva"><em>I</em></button>
+      <button type="button" data-command="underline" title="Subrayado"><u>U</u></button>
+      <span class="format-separator"></span>
+      <button type="button" data-command="insertUnorderedList" title="Lista">☷</button>
+      <button type="button" data-command="insertOrderedList" title="Lista numerada">☰</button>
+      <button type="button" data-command="justifyLeft" title="Alinear a la izquierda">≡</button>
+      <button type="button" data-command="justifyCenter" title="Centrar">≡</button>
+      <button type="button" data-command="justifyRight" title="Alinear a la derecha">≡</button>
+      <span class="format-separator"></span>
+      <button type="button" data-command="createLink" title="Insertar enlace">↗</button>
+      <button type="button" id="formatImageButton" title="Insertar imagen">▧</button>
+      <select id="formatFontSelect" title="Fuente"><option value="IBM Plex Sans">Inter</option><option value="Georgia">Georgia</option><option value="Arial">Arial</option></select>
+      <select id="formatSizeSelect" title="Tamaño"><option value="3">14</option><option value="2">12</option><option value="4">16</option><option value="5">18</option></select>
+      <label class="format-color" title="Color del texto">A<input type="color" id="formatColorInput" value="#3163E8" aria-label="Elegir color del texto"></label>
+      <button type="button" title="Más opciones">⋮</button>
     </div>
 
     <div class="paper" id="editor" contenteditable="false">
-      <p class="empty-note">Aún no hay texto cargado. Pulsa “Cargar texto” para pegar el modelo de contrato base (puede incluir imágenes, como un membrete o un logo). Luego coloca el cursor en cualquier punto: con “+ Campo” abres una ventana para escribir la información que debe ir ahí (nombre del cliente, fecha, monto...); con “+ Imagen” insertas una foto, firma o sello. También puedes pegar (Ctrl/Cmd+V) o arrastrar una imagen directamente sobre el documento y se detectará e incrustará automáticamente. Haz clic sobre cualquier imagen para arrastrar su esquina y cambiar el tamaño, elegir si el texto la rodea o no, y moverla a cualquier parte de la hoja.</p>
+      <p class="empty-note">Carga un contrato para comenzar.</p>
+    </div>
+    <div class="editor-footer">
+      <div class="footer-tip"><strong>i</strong><span>Selecciona una imagen para ajustarla.</span></div>
+      <div class="zoom-control"><button type="button" id="zoomOut" title="Alejar">−</button><span id="zoomValue">100%</span><button type="button" id="zoomIn" title="Acercar">+</button></div>
     </div>
   </div>
 
   <div class="sidebar">
     <div class="sidebar-section">
-      <h2>Modelos guardados</h2>
-      <div class="sidebar-sub">Plantillas guardadas en este navegador. Selecciona una para reutilizarla: al llenar los campos y exportar a Word, el modelo original no se modifica.</div>
+      <div class="panel-heading"><h2>Modelos guardados</h2></div>
+      <div class="sidebar-sub">Reutiliza tus modelos</div>
       <div id="templatesList">
         <div class="no-fields">Todavía no has guardado ningún modelo.</div>
       </div>
     </div>
     <div class="sidebar-section">
-      <h2>Campos del documento</h2>
-      <div class="sidebar-sub">Secciones rellenables que has insertado.</div>
-      <div id="fieldsList">
+      <div class="panel-heading"><h2>Campos del documento</h2></div>
+      <div class="sidebar-sub">Campos insertados</div>
+      <div id="fieldsList" data-summary="☷  Secciones: 0">
         <div class="no-fields">Todavía no has insertado ningún campo.</div>
       </div>
     </div>
 
     <div class="sidebar-section">
-      <h2>Imágenes detectadas</h2>
-      <div class="sidebar-sub">Imágenes pegadas, arrastradas o insertadas en el documento.</div>
-      <div id="imagesList">
+      <div class="panel-heading"><h2>Imágenes detectadas</h2></div>
+      <div class="sidebar-sub">Imágenes del documento</div>
+      <div id="imagesList" data-summary="▧  Imágenes: 0">
         <div class="no-fields">Todavía no hay imágenes en el documento.</div>
       </div>
     </div>
@@ -898,7 +1286,7 @@
 <div class="overlay" id="fieldOverlay">
   <div class="modal">
     <h3 id="fieldModalTitle">Insertar campo</h3>
-    <div class="modal-sub">Este texto se insertará resaltado en el punto que seleccionaste.</div>
+    <div class="modal-sub">Completa los datos del campo.</div>
     <label for="fieldLabel">Nombre del campo (referencia interna)</label>
     <input type="text" id="fieldLabel" placeholder="Ej: Nombre del cliente">
     <label for="fieldValue">Texto a insertar</label>
@@ -915,9 +1303,9 @@
 <div class="overlay" id="loadOverlay">
   <div class="modal load-panel">
     <h3>Cargar texto del contrato</h3>
-    <div class="modal-sub">Pega aquí el modelo base. Cada línea en blanco crea un nuevo párrafo. Si pegas una imagen (por ejemplo copiada de un documento de Word), se detecta y se incrusta automáticamente.</div>
+    <div class="modal-sub">Pega el texto del contrato.</div>
     <div class="load-rich" id="loadRich" contenteditable="true" data-placeholder="Pega aquí el texto (y las imágenes) del contrato..."></div>
-    <div class="load-note">También puedes arrastrar un archivo de imagen hasta aquí.</div>
+    <div class="load-note">También puedes pegar o arrastrar imágenes.</div>
     <div class="modal-actions">
       <button class="btn-text" id="loadCancel">Cancelar</button>
       <button class="btn-brass" id="loadConfirm">Cargar en el documento</button>
@@ -929,7 +1317,7 @@
 <div class="overlay" id="templateSaveOverlay">
   <div class="modal">
     <h3>Guardar como modelo</h3>
-    <div class="modal-sub">Se guarda el documento tal cual está ahora (texto, campos e imágenes) en este navegador. Luego podrás seleccionarlo, completar los campos para un caso puntual y exportarlo a Word: el modelo quedará intacto para usarlo de nuevo.</div>
+    <div class="modal-sub">Guarda una copia reutilizable del documento.</div>
     <label for="templateNameInput">Nombre del modelo</label>
     <input type="text" id="templateNameInput" placeholder="Ej: Contrato de arrendamiento">
     <div class="modal-actions">
@@ -978,6 +1366,57 @@
     });
   }
 
+  // ---------- Barra de formato, zoom y paneles ----------
+  const formatbar = document.getElementById('editorFormatbar');
+  const formatImageButton = document.getElementById('formatImageButton');
+  const formatFontSelect = document.getElementById('formatFontSelect');
+  const formatSizeSelect = document.getElementById('formatSizeSelect');
+  const formatColorInput = document.getElementById('formatColorInput');
+  const zoomOut = document.getElementById('zoomOut');
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomValue = document.getElementById('zoomValue');
+  let editorZoom = 100;
+
+  function runEditorCommand(command, value){
+    if (!editor || editor.getAttribute('contenteditable') !== 'true') return;
+    editor.focus();
+    if (savedRange) {
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
+    }
+    if (command === 'createLink') {
+      const url = window.prompt('Dirección del enlace');
+      if (!url) return;
+      value = url;
+    }
+    document.execCommand(command, false, value || null);
+    editor.dispatchEvent(new Event('input', { bubbles:true }));
+  }
+
+  if (formatbar) {
+    formatbar.querySelectorAll('[data-command]').forEach((button) => {
+      button.addEventListener('mousedown', (event) => event.preventDefault());
+      button.addEventListener('click', () => runEditorCommand(button.dataset.command));
+    });
+  }
+  if (formatImageButton) formatImageButton.addEventListener('click', () => btnInsertImage.click());
+  if (formatFontSelect) formatFontSelect.addEventListener('change', () => runEditorCommand('fontName', formatFontSelect.value));
+  if (formatSizeSelect) formatSizeSelect.addEventListener('change', () => runEditorCommand('fontSize', formatSizeSelect.value));
+  if (formatColorInput) formatColorInput.addEventListener('input', () => {
+    formatColorInput.parentElement.style.setProperty('--format-color', formatColorInput.value);
+    runEditorCommand('foreColor', formatColorInput.value);
+  });
+  function updateEditorZoom(){
+    if (!editor) return;
+    editor.style.zoom = `${editorZoom / 100}`;
+    if (zoomValue) zoomValue.textContent = editorZoom + '%';
+  }
+  if (zoomOut) zoomOut.addEventListener('click', () => { editorZoom = Math.max(60, editorZoom - 10); updateEditorZoom(); });
+  if (zoomIn) zoomIn.addEventListener('click', () => { editorZoom = Math.min(140, editorZoom + 10); updateEditorZoom(); });
+  document.querySelectorAll('.panel-heading').forEach((heading) => {
+    heading.addEventListener('click', () => heading.parentElement.classList.toggle('collapsed'));
+  });
   // ---------- Aviso / confirmación en pantalla (no usar alert()/confirm()) ----------
   // Los diálogos nativos alert()/confirm() pueden quedar bloqueados o sin
   // respuesta dentro de algunos contenedores de escritorio (p. ej. una
@@ -1772,6 +2211,7 @@
   // ---------- Panel lateral: campos ----------
   function refreshFieldsList(){
     const spans = editor.querySelectorAll('.campo');
+    fieldsListEl.dataset.summary = '☷  Secciones: ' + spans.length;
     if (spans.length === 0) {
       fieldsListEl.innerHTML = '<div class="no-fields">Todavía no has insertado ningún campo.</div>';
       return;
@@ -1817,6 +2257,7 @@
   // ---------- Panel lateral: imágenes ----------
   function refreshImagesList(){
     const wraps = editor.querySelectorAll('.img-wrap');
+    imagesListEl.dataset.summary = '▧  Imágenes: ' + wraps.length;
     if (wraps.length === 0) {
       imagesListEl.innerHTML = '<div class="no-fields">Todavía no hay imágenes en el documento.</div>';
       return;
@@ -2056,7 +2497,7 @@
         const perm = await newHandle.requestPermission({ mode: 'readwrite' });
         if (perm !== 'granted') throw new Error('permiso denegado');
         dirHandle = newHandle;
-        saveRememberedDirHandle(dirHandle);
+        await saveRememberedDirHandle(dirHandle);
       }
       useDirectAccess = true;
       folderDot.className = 'dot on';
@@ -2065,7 +2506,7 @@
       useDirectAccess = false;
       folderDot.className = 'dot warn';
       if (dirHandle) {
-        folderStatus.textContent = 'No se pudo reactivar el acceso a "' + dirHandle.name + '". Vuelve a pulsar "Elegir carpeta de guardado" para intentarlo de nuevo.';
+        folderStatus.textContent = 'No se pudo reactivar el acceso a "' + dirHandle.name + '". Vuelve a pulsar "Seleccionar carpeta" para intentarlo de nuevo.';
       } else {
         folderStatus.textContent = 'No se pudo obtener acceso directo a una carpeta en este entorno (restricción del navegador/ventana). Cada "Guardar" descargará el archivo .doc a tu carpeta de descargas.';
       }
@@ -2095,7 +2536,7 @@
     } catch (err) { /* algunos entornos no soportan queryPermission; se ignora */ }
     useDirectAccess = false;
     folderDot.className = 'dot warn';
-    folderStatus.textContent = 'Carpeta recordada: "' + handle.name + '". Pulsa "Elegir carpeta de guardado" para reactivar el acceso (no hace falta volver a buscarla).';
+    folderStatus.textContent = 'Carpeta recordada: "' + handle.name + '". Pulsa "Seleccionar carpeta" para reactivar el acceso (no hace falta volver a buscarla).';
     refreshFolderFilesList();
   }
   tryRestoreRememberedFolder();
@@ -2108,6 +2549,23 @@
 
   let lastFolderEntries = [];
 
+  async function reactivateRememberedFolder(){
+    if (!('showDirectoryPicker' in window)) return false;
+    if (!dirHandle) dirHandle = await loadRememberedDirHandle();
+    if (!dirHandle || typeof dirHandle.requestPermission !== 'function') return false;
+    try {
+      const permission = await dirHandle.requestPermission({ mode:'readwrite' });
+      if (permission !== 'granted') return false;
+      useDirectAccess = true;
+      folderDot.className = 'dot on';
+      folderStatus.textContent = 'Carpeta seleccionada: "' + dirHandle.name + '". Cada guardado creará ahí una nueva versión.';
+      return true;
+    } catch (err) {
+      useDirectAccess = false;
+      return false;
+    }
+  }
+
   async function refreshFolderFilesList(){
     if (!folderFilesListEl) return;
     if (!dirHandle) {
@@ -2119,7 +2577,7 @@
     if (!useDirectAccess) {
       lastFolderEntries = [];
       setFolderSearchEnabled(false);
-      folderFilesListEl.innerHTML = '<div class="no-fields">Carpeta recordada, pero sin permiso activo todavía. Pulsa "Elegir carpeta de guardado" para reactivarlo (no hace falta volver a buscarla).</div>';
+      folderFilesListEl.innerHTML = '<div class="no-fields">Carpeta recordada, pero sin permiso activo todavía. Pulsa "Seleccionar carpeta" para reactivarlo (no hace falta volver a buscarla).</div>';
       return;
     }
     folderFilesListEl.innerHTML = '<div class="no-fields">Cargando archivos...</div>';
@@ -2203,7 +2661,12 @@
     });
   }
 
-  btnRefreshFolderFiles.addEventListener('click', () => refreshFolderFilesList());
+  btnRefreshFolderFiles.addEventListener('click', async () => {
+    if (!useDirectAccess) {
+      await reactivateRememberedFolder();
+    }
+    await refreshFolderFilesList();
+  });
 
   // Quita etiquetas que nunca deben interpretarse como contenido del
   // documento (script, style, etc.) antes de reinsertar el HTML leído
@@ -2385,11 +2848,11 @@
   function buildExportHtml(){
     const clone = editor.cloneNode(true);
     clone.querySelectorAll('.campo').forEach(span => {
+      const value = span.getAttribute('data-value') || '';
+      if (!value.trim()) span.textContent = '';
       span.removeAttribute('contenteditable');
       span.removeAttribute('id');
-      span.style.background = 'transparent';
-      span.style.borderBottom = '1px solid #666';
-      span.style.fontWeight = '600';
+      span.removeAttribute('class');
     });
     clone.querySelectorAll('.img-wrap').forEach(wrap => {
       const liveWrap = document.getElementById(wrap.id);
@@ -2417,6 +2880,16 @@
     return clone.innerHTML;
   }
 
+  function prepareFieldsForPrint(){
+    const changedFields = [];
+    editor.querySelectorAll('.campo').forEach(span => {
+      const value = span.getAttribute('data-value') || '';
+      changedFields.push({ span, text: span.textContent });
+      span.textContent = value.trim();
+    });
+    return () => changedFields.forEach(({ span, text }) => { span.textContent = text; });
+  }
+
   // ---------- Imprimir ----------
   async function runPrintFlow(){
     if (!hasContent) {
@@ -2428,10 +2901,12 @@
     // (definida en main.js / rc-print), en vez del diálogo nativo del SO.
     if (window.rcPrint && window.rcPrint.print) {
       btnPrint.disabled = true;
+      const restoreFields = prepareFieldsForPrint();
       try {
         const ok = await window.rcPrint.print();
         if (!ok) await showNotice('No se pudo generar la vista previa de impresión.');
       } finally {
+        restoreFields();
         btnPrint.disabled = false;
       }
       return;
@@ -2461,14 +2936,10 @@
     line-height:1.6;
     color:#1a1a1a;
     padding: 24px 32px;
+    background:#fff;
   }
   p{ margin:0 0 12pt 0; }
   img{ max-width:100%; }
-  .campo{
-    background:transparent;
-    border-bottom:1px solid #666;
-    font-weight:600;
-  }
 </style>
 </head>
 <body>${bodyHtml}</body>
