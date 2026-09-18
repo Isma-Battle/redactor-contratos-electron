@@ -3,7 +3,15 @@
 // File System Access API del propio navegador (Chromium), que ya
 // funcionan sin ayuda de Node. Lo que exponemos aquí es la API de
 // actualizaciones (botón "Buscar actualizaciones") y la API de
-// impresión, que genera el PDF de vista previa y abre el modal.
+// impresión.
+//
+// La impresión ya NO abre una ventana de vista previa propia de
+// Electron: print(payload) manda el HTML final del contrato (ya
+// resuelto: campos con su valor, imágenes con su posición) junto con
+// el tamaño de papel y la orientación elegidos, y main.js lo escribe a
+// un archivo temporal que abre con el navegador predeterminado del
+// sistema operativo. Desde ahí el usuario imprime con el propio
+// diálogo del navegador (Ctrl+P).
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -16,9 +24,7 @@ contextBridge.exposeInMainWorld('rcUpdater', {
 });
 
 contextBridge.exposeInMainWorld('rcPrint', {
-  // Genera el PDF de vista previa a partir del contenido actual del
-  // editor y abre la ventana modal de impresión. Devuelve true/false.
-  // opts admite { pageSize, landscape } elegidos en el editor principal;
-  // si se omiten, main.js usa A4 vertical por defecto.
-  print: (opts) => ipcRenderer.invoke('rc-print', opts)
+  // payload: { bodyHtml, pageSize, landscape, title }
+  // Devuelve { success: true, filePath } o { success: false, error }.
+  print: (payload) => ipcRenderer.invoke('rc-print', payload)
 });

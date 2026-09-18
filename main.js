@@ -1,19 +1,14 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { pathToFileURL } = require('url');
 
 let mainWindow = null;
-let previewWindow = null;
-let printerProbeWindow = null;
-let currentPdfPath = null;
 
-// Recuerda las últimas opciones de papel/orientación usadas, para que el
-// modal de vista previa se abra ya con el mismo tamaño que eligió el
-// usuario en el editor principal (en vez de reiniciar siempre en A4).
-let currentPrintOptions = { pageSize: 'A4', landscape: false };
+// Ruta del último documento de impresión generado, para poder borrarlo
+// antes de crear uno nuevo (no queremos ir acumulando archivos temporales).
+let lastPrintFilePath = null;
 
 // ---------------------------------------------------------------
 // Logging a archivo (para poder diagnosticar en la app empaquetada,
@@ -96,293 +91,105 @@ ipcMain.handle('rc-install-update-now', () => {
 });
 
 // ---------------------------------------------------------------
-// Tamaños de página en micrones (anchura x altura, en orientación
-// vertical/portrait). Se usan como respaldo cuando el nombre de papel
-// como string ("A4", "Legal", etc.) no es respetado por el driver de la
-// impresora en modo de impresión silenciosa (bug conocido de Electron/
-// Chromium en Windows: el string de pageSize a veces se ignora y cae al
-// tamaño predeterminado del driver, normalmente Carta/Letter).
-// Los valores están en micrones, tal como los espera Electron cuando
-// pageSize es un objeto {width, height}.
-// ---------------------------------------------------------------
-const PAGE_SIZES_MICRONS = {
-  A3: { width: 297000, height: 420000 },
-  A4: { width: 210000, height: 297000 },
-  A5: { width: 148000, height: 210000 },
-  Legal: { width: 215900, height: 355600 },
-  Letter: { width: 215900, height: 279400 },
-  Tabloid: { width: 279400, height: 431800 }
-};
-
-// Convierte el nombre de papel elegido por el usuario en el objeto de
-// medidas exactas que se le pasa a webContents.print(). Si el usuario
-// pasa landscape:true, invertimos ancho/alto aquí mismo y llamamos a
-// print() con landscape:false, para evitar que Electron intente rotar
-// dos veces (una vez nosotros, otra vez el propio flag landscape).
-function resolvePrintPageSize(pageSize, landscape) {
-  const size = PAGE_SIZES_MICRONS[pageSize];
-  if (!size) return pageSize; // nombre no reconocido: se deja tal cual
-  return landscape ? { width: size.height, height: size.width } : { width: size.width, height: size.height };
-}
-
-// ---------------------------------------------------------------
-// Vista previa de impresión (ventana modal)
-// ---------------------------------------------------------------
-
-// Abre la ventana modal ocupando toda la resolución disponible de la
-// pantalla (se calcula con `screen.getPrimaryDisplay()` y además se
-// maximiza, para cubrir también monitores con distinta densidad/escala).
-function openPreviewWindow() {
-  if (previewWindow && !previewWindow.isDestroyed()) {
-    previewWindow.focus();
-    return;
-  }
-  const { workAreaSize, workArea } = screen.getPrimaryDisplay();
-
-  previewWindow = new BrowserWindow({
-    width: workAreaSize.width,
-    height: workAreaSize.height,
-    x: workArea.x,
-    y: workArea.y,
-    minWidth: 760,
-    minHeight: 600,
-    parent: mainWindow,
-    modal: true,
-    show: false,
-    backgroundColor: '#1E2A38',
-    title: 'Vista previa de impresión',
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preview-preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  });
-
-  previewWindow.setMenuBarVisibility(false);
-  previewWindow.webContents.on('preload-error', (event, preloadPath, error) => {
-    writeLog('ERROR EN PRELOAD DE PREVIEW:', preloadPath, error);
-  });
-  previewWindow.webContents.on('render-process-gone', (event, details) => {
-    writeLog('PREVIEWWINDOW RENDER-PROCESS-GONE:', details);
-  });
-  previewWindow.webContents.on('unresponsive', () => {
-    writeLog('PREVIEWWINDOW UNRESPONSIVE');
-  });
-
-  // Atajo para abrir DevTools también en la app empaquetada (Ctrl+Shift+I
-  // no funciona sin menú; esto lo fuerza manualmente).
-  previewWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-      previewWindow.webContents.openDevTools({ mode: 'detach' });
-    }
-  });
-
-  previewWindow.loadFile(path.join(__dirname, 'renderer', 'preview.html'));
-
-  previewWindow.once('ready-to-show', () => {
-    previewWindow.maximize();
-    previewWindow.show();
-  });
-
-  previewWindow.on('closed', () => {
-    previewWindow = null;
-  });
-}
-
-// Genera (o regenera) el PDF de vista previa a partir del contenido
-// actual de la ventana principal, respetando el tamaño de papel y la
-// orientación elegidos. Devuelve la URL file:// del PDF o null si falla.
-async function setMainWindowFieldsForOutput(plainText) {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  const fieldScript = plainText
-    ? "document.querySelectorAll('.campo').forEach((span) => { span.textContent = (span.getAttribute('data-value') || '').trim(); });"
-    : "document.querySelectorAll('.campo').forEach((span) => { const value = (span.getAttribute('data-value') || '').trim(); const label = span.getAttribute('data-label') || ''; span.textContent = value || '[' + label + ']'; });";
-  await mainWindow.webContents.executeJavaScript(`(() => { ${fieldScript} })()`, true);
-}
-
-async function generatePdfPreview(opts) {
-  if (!mainWindow || mainWindow.isDestroyed()) return null;
-  const options = opts || {};
-  let fieldsPrepared = false;
-  try {
-    await setMainWindowFieldsForOutput(true);
-    fieldsPrepared = true;
-    const pdfBuffer = await mainWindow.webContents.printToPDF({
-      printBackground: true,
-      landscape: !!options.landscape,
-      pageSize: options.pageSize || 'A4',
-      margins: { marginType: 'default' }
-    });
-
-    if (currentPdfPath && fs.existsSync(currentPdfPath)) {
-      try { fs.unlinkSync(currentPdfPath); } catch (e) { /* no crítico */ }
-    }
-    currentPdfPath = path.join(os.tmpdir(), `contrato-preview-${Date.now()}.pdf`);
-    fs.writeFileSync(currentPdfPath, pdfBuffer);
-    writeLog('generatePdfPreview OK:', currentPdfPath, 'opciones:', options);
-    return pathToFileURL(currentPdfPath).href;
-  } catch (err) {
-    writeLog('Error generando la vista previa de impresión:', err);
-    return null;
-  } finally {
-    if (fieldsPrepared) {
-      try { await setMainWindowFieldsForOutput(false); } catch (err) { writeLog('Error restaurando campos:', err); }
-    }
-  }
-}
-
-// Genera el PDF inicial y abre la ventana modal, usando el tamaño de
-// papel y la orientación que el usuario haya elegido en el editor
-// principal (index.html). Si no llega nada, se usa A4 vertical como
-// valor por defecto.
-ipcMain.handle('rc-print', async (event, opts) => {
-  const options = opts || {};
-  currentPrintOptions = {
-    pageSize: options.pageSize || 'A4',
-    landscape: !!options.landscape
-  };
-  writeLog('rc-print opciones recibidas del editor:', currentPrintOptions);
-
-  const url = await generatePdfPreview(currentPrintOptions);
-  if (!url) return false;
-  openPreviewWindow();
-  return true;
-});
-
-// Regenera el PDF cuando el usuario cambia tipo de papel u orientación
-// dentro del modal, para que la vista previa refleje el cambio.
-ipcMain.handle('rc-update-preview', async (event, opts) => {
-  const options = opts || {};
-  currentPrintOptions = {
-    pageSize: options.pageSize || 'A4',
-    landscape: !!options.landscape
-  };
-  return await generatePdfPreview(currentPrintOptions);
-});
-
-ipcMain.handle('rc-get-pdf-path', () => {
-  if (!currentPdfPath || !fs.existsSync(currentPdfPath)) return null;
-  return pathToFileURL(currentPdfPath).href;
-});
-
-// Permite que preview.html, al abrirse, sincronice sus controles
-// (tamaño de papel / orientación) con lo que ya se eligió en el editor,
-// en vez de reiniciar siempre en A4 vertical.
-ipcMain.handle('rc-get-print-options', () => currentPrintOptions);
-
-// Ventana oculta dedicada solo a consultar impresoras. La separamos del
-// webContents de mainWindow porque printToPDF() repetido (al cambiar papel
-// u orientación en el preview) puede dejar el print backend en mal estado
-// y getPrintersAsync() empieza a devolver [] sin lanzar error.
-async function getSystemPrinters() {
-  if (!printerProbeWindow || printerProbeWindow.isDestroyed()) {
-    writeLog('getSystemPrinters: creando printerProbeWindow nueva');
-    printerProbeWindow = new BrowserWindow({
-      show: false,
-      webPreferences: { sandbox: false }
-    });
-    printerProbeWindow.webContents.on('render-process-gone', (event, details) => {
-      writeLog('PRINTERPROBEWINDOW RENDER-PROCESS-GONE:', details);
-    });
-    await printerProbeWindow.loadURL('about:blank');
-  }
-  try {
-    const printers = await printerProbeWindow.webContents.getPrintersAsync();
-    writeLog('rc-get-printers OK: encontradas', printers.length, 'impresoras');
-    return printers;
-  } catch (err) {
-    writeLog('getSystemPrinters ERROR:', err);
-    // Si falla, destruimos la ventana probe para forzar una nueva en el
-    // siguiente intento, en vez de quedar atascados con un webContents malo.
-    if (printerProbeWindow && !printerProbeWindow.isDestroyed()) {
-      printerProbeWindow.destroy();
-    }
-    printerProbeWindow = null;
-    return [];
-  }
-}
-
-ipcMain.handle('rc-get-printers', async () => {
-  return await getSystemPrinters();
-});
-
-// El trabajo de impresión real se ejecuta sobre la ventana principal
-// (no sobre la vista previa), silencioso y con las opciones elegidas
-// en el modal. Las reglas @media print de index.html se encargan de
-// ocultar la interfaz y mostrar solo el contrato.
+// Impresión: ya NO se usa una ventana de vista previa propia de
+// Electron ni webContents.print()/printToPDF(). En su lugar:
 //
-// IMPORTANTE sobre el tamaño de papel: en impresión silenciosa
-// (silent:true) en Windows, Electron/Chromium a veces IGNORA el nombre
-// de papel como string ("A4", "Legal", etc.) si el driver de la
-// impresora no lo reconoce exactamente igual, y cae de vuelta al
-// tamaño predeterminado del driver (casi siempre Carta/Letter). Para
-// evitar esto, convertimos el nombre a medidas exactas en micrones
-// (resolvePrintPageSize) antes de pasarlo a print(). Si el nombre no es
-// uno de los reconocidos, se manda el string tal cual como respaldo.
-ipcMain.handle('rc-execute-print', async (event, opts) => {
-  writeLog('rc-execute-print opciones recibidas:', opts);
+//   1. El renderer (index.html) ya construye el HTML final del
+//      contrato (campos resueltos a su valor, imágenes con su
+//      posición) mediante buildExportHtml() y lo envía aquí junto con
+//      el tamaño de papel y la orientación elegidos.
+//   2. Aquí se envuelve ese HTML en un documento completo con su
+//      propio <style> (incluida la regla @page con el tamaño elegido)
+//      y se escribe a un archivo .html temporal.
+//   3. shell.openPath() abre ese archivo con la aplicación asociada a
+//      .html en el sistema operativo -normalmente el navegador
+//      predeterminado de Windows (Chrome, Edge, Firefox, etc.)-, FUERA
+//      de Electron por completo.
+//   4. Desde ahí el usuario imprime con el propio diálogo del
+//      navegador (Ctrl+P), que sí respeta el tamaño de papel elegido
+//      y no sufre el bug de impresión silenciosa de Electron/Chromium
+//      en Windows que ignoraba el pageSize.
+// ---------------------------------------------------------------
+ipcMain.handle('rc-print', async (event, payload) => {
+  const opts = payload || {};
+  const bodyHtml = opts.bodyHtml || '';
+  const pageSize = opts.pageSize || 'A4';
+  const landscape = !!opts.landscape;
+  const rawTitle = (opts.title || 'contrato').toString();
 
-  try {
-    await setMainWindowFieldsForOutput(true);
-  } catch (err) {
-    writeLog('Error preparando campos para imprimir:', err);
-    return { success: false, errorType: 'prepare-fields-failed' };
+  writeLog('rc-print: generando documento para el navegador. Opciones:', { pageSize, landscape, title: rawTitle });
+
+  if (!bodyHtml.trim()) {
+    return { success: false, error: 'sin-contenido' };
   }
 
-  return new Promise((resolve) => {
-    const restoreAndResolve = (result) => {
-      setMainWindowFieldsForOutput(false)
-        .catch((err) => writeLog('Error restaurando campos tras imprimir:', err))
-        .finally(() => resolve(result));
-    };
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      restoreAndResolve({ success: false });
-      return;
+  const pageSizeCss = landscape ? `${pageSize} landscape` : pageSize;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${rawTitle}</title>
+<style>
+  @page { size: ${pageSizeCss}; margin: 2cm; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    font-size:12pt;
+    line-height:1.6;
+    color:#1a1a1a;
+    padding: 24px 32px;
+    background:#fff;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  p{ margin:0 0 12pt 0; }
+  img{ max-width:100%; }
+  .print-hint{
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    color: #666;
+    background: #fff8e1;
+    border: 1px solid #f0d98c;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }
+  @media print{
+    .print-hint{ display:none; }
+    body{ padding: 0; max-width:none; }
+  }
+</style>
+</head>
+<body>
+<div class="print-hint">Para imprimir, usa Ctrl+P (o el menú del navegador). El tamaño de papel "${pageSize}"${landscape ? ' horizontal' : ''} ya viene preconfigurado; puedes cambiarlo también en el propio diálogo de impresión del navegador.</div>
+${bodyHtml}
+</body>
+</html>`;
+
+  try {
+    // Borra el documento de impresión anterior antes de crear uno nuevo.
+    if (lastPrintFilePath && fs.existsSync(lastPrintFilePath)) {
+      try { fs.unlinkSync(lastPrintFilePath); } catch (e) { /* no crítico */ }
     }
-    try {
-      const resolvedPageSize = resolvePrintPageSize(opts.pageSize || 'A4', !!opts.landscape);
-      // Si resolvedPageSize es un objeto {width,height} ya viene con la
-      // orientación aplicada, así que print() se llama con landscape:false
-      // para que Chromium no intente rotarlo una segunda vez. Si es un
-      // string (nombre no reconocido), se respeta el flag landscape normal.
-      const isResolvedObject = typeof resolvedPageSize === 'object';
-      writeLog('rc-execute-print pageSize resuelto:', resolvedPageSize, 'esObjeto:', isResolvedObject);
+    const safeTitle = rawTitle.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'contrato';
+    lastPrintFilePath = path.join(os.tmpdir(), `${safeTitle}-${Date.now()}.html`);
+    fs.writeFileSync(lastPrintFilePath, html, 'utf8');
+    writeLog('rc-print: archivo generado en', lastPrintFilePath);
 
-      mainWindow.webContents.print({
-        silent: true, // clave: evita el diálogo nativo del SO
-        deviceName: opts.deviceName,
-        copies: Math.max(1, parseInt(opts.copies, 10) || 1),
-        color: opts.color !== false,
-        landscape: isResolvedObject ? false : !!opts.landscape,
-        printBackground: opts.printBackground !== false,
-        pageSize: resolvedPageSize,
-        margins: { marginType: opts.marginsType || 'default' }
-      }, (success, errorType) => {
-        writeLog('rc-execute-print resultado:', success, errorType);
-        restoreAndResolve({ success, errorType: errorType || null });
-      });
-    } catch (err) {
-      writeLog('Error ejecutando impresión:', err);
-      restoreAndResolve({ success: false, errorType: 'print-failed' });
+    const errorMsg = await shell.openPath(lastPrintFilePath);
+    if (errorMsg) {
+      // shell.openPath devuelve un string vacío si todo salió bien, o un
+      // mensaje de error si no pudo abrir el archivo (por ejemplo, si no
+      // hay ninguna aplicación asociada a .html en el sistema).
+      writeLog('rc-print: shell.openPath devolvió error:', errorMsg);
+      return { success: false, error: errorMsg };
     }
-  });
-});
-
-ipcMain.handle('rc-save-pdf', async () => {
-  if (!currentPdfPath || !fs.existsSync(currentPdfPath)) return { success: false };
-  const { canceled, filePath } = await dialog.showSaveDialog(previewWindow, {
-    defaultPath: 'contrato.pdf',
-    filters: [{ name: 'PDF', extensions: ['pdf'] }]
-  });
-  if (canceled || !filePath) return { success: false, canceled: true };
-  fs.copyFileSync(currentPdfPath, filePath);
-  return { success: true, filePath };
-});
-
-ipcMain.handle('rc-close-preview', () => {
-  if (previewWindow && !previewWindow.isDestroyed()) previewWindow.close();
+    return { success: true, filePath: lastPrintFilePath };
+  } catch (err) {
+    writeLog('rc-print ERROR:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 function createWindow() {
@@ -412,8 +219,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   // Detecta si el renderer de la ventana principal se cae o deja de
-  // responder. Si esto ocurre, printToPDF y getPrintersAsync fallarán
-  // silenciosamente porque dependen de este webContents.
+  // responder.
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     writeLog('MAINWINDOW RENDER-PROCESS-GONE:', details);
   });
@@ -437,13 +243,11 @@ function createWindow() {
   });
 
   // Abre enlaces externos (http/https) en el navegador del sistema, no dentro de la app
-  // Permite ventanas internas (diálogos de impresión, etc.) bloqueando solo URLs externas
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
-    // Permite diálogos internos (print, etc.) que no tienen URL o tienen about:blank
     return { action: 'allow' };
   });
 
@@ -502,6 +306,5 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (printerProbeWindow && !printerProbeWindow.isDestroyed()) printerProbeWindow.destroy();
   if (process.platform !== 'darwin') app.quit();
 });

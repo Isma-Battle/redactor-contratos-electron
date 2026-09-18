@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redactor de Contratos</title>
+<title>Redactor de Contratos v1.0.10</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
@@ -937,7 +937,7 @@
   .license-status.ok{color:var(--ok);}
 
   /* ---------- Composición del editor ---------- */
-  .brand h1::after{content:'  v1.0.11'; color:var(--text-muted); font-size:.8em; font-weight:500;}
+  .brand h1::after{content:'  v1.0.7'; color:var(--text-muted); font-size:.8em; font-weight:500;}
   .topbar-actions .update-toggle{
     display:inline-flex;
     align-items:center;
@@ -1263,7 +1263,7 @@
           Horizontal
         </label>
       </div>
-      <span class="hint">Selecciona una imagen para editarla</span>
+      <span class="hint">"Imprimir" abre el documento en tu navegador — usa Ctrl+P ahí para imprimir</span>
     </div>
 
     <div class="editor-formatbar" id="editorFormatbar" aria-label="Formato del documento">
@@ -2932,58 +2932,54 @@
     return clone.innerHTML;
   }
 
-  function prepareFieldsForPrint(){
-    const changedFields = [];
-    editor.querySelectorAll('.campo').forEach(span => {
-      const value = span.getAttribute('data-value') || '';
-      changedFields.push({ span, text: span.textContent });
-      span.textContent = value.trim();
-    });
-    return () => changedFields.forEach(({ span, text }) => { span.textContent = text; });
-  }
-
   // ---------- Imprimir ----------
+  // Ya no se abre una vista previa propia de Electron: se genera el
+  // HTML final del contrato (buildExportHtml ya resuelve los campos a
+  // su valor y las imágenes a su posición, sin tocar el editor en
+  // vivo) y se manda a main.js, que lo abre con el navegador
+  // predeterminado del sistema operativo. Desde ahí el usuario imprime
+  // con el propio diálogo del navegador (Ctrl+P).
   async function runPrintFlow(){
     if (!hasContent) {
       await showNotice('Primero carga el texto del contrato.');
       return;
     }
 
-    // Tamaño de papel y orientación elegidos en la barra de herramientas
-    // del editor. Se mandan a main.js para que la primera vista previa
-    // (o la impresión, en el fallback sin Electron) ya nazca con el
-    // tamaño correcto, en vez de asumir A4 siempre.
     const chosenPageSize = paperSizeSelect ? paperSizeSelect.value : 'A4';
     const chosenLandscape = landscapeCheckbox ? landscapeCheckbox.checked : false;
+    const bodyHtml = buildExportHtml();
+    const title = (baseNameInput.value.trim() || 'contrato');
 
-    // Camino Electron: genera el PDF y abre tu ventana de vista previa
-    // (definida en main.js / rc-print), en vez del diálogo nativo del SO.
+    // Camino Electron: genera un archivo .html temporal con el
+    // documento y lo abre con el navegador predeterminado del sistema
+    // (fuera de Electron). No se dispara ninguna impresión automática:
+    // el usuario ve el documento y decide cuándo imprimir desde ahí.
     if (window.rcPrint && window.rcPrint.print) {
       btnPrint.disabled = true;
-      const restoreFields = prepareFieldsForPrint();
       try {
-        const ok = await window.rcPrint.print({
+        const result = await window.rcPrint.print({
+          bodyHtml,
           pageSize: chosenPageSize,
-          landscape: chosenLandscape
+          landscape: chosenLandscape,
+          title
         });
-        if (!ok) await showNotice('No se pudo generar la vista previa de impresión.');
+        if (!result || !result.success) {
+          await showNotice('No se pudo abrir el documento en el navegador' + (result && result.error ? (': ' + result.error) : '.'));
+        }
       } finally {
-        restoreFields();
         btnPrint.disabled = false;
       }
       return;
     }
 
     // Fallback: si esto se abre en un navegador normal (sin Electron),
-    // se mantiene el comportamiento anterior con window.print(). El
-    // tamaño de papel se aplica vía @page en el documento de impresión.
-    const bodyHtml = buildExportHtml();
+    // se abre una pestaña nueva con el mismo documento. El tamaño de
+    // papel se aplica vía @page; el usuario imprime con Ctrl+P.
     const printWin = window.open('', '_blank');
     if (!printWin) {
-      await showNotice('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio e inténtalo de nuevo.');
+      await showNotice('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e inténtalo de nuevo.');
       return;
     }
-    const title = (baseNameInput.value.trim() || 'contrato');
     const pageSizeCss = chosenLandscape ? `${chosenPageSize} landscape` : chosenPageSize;
     printWin.document.open();
     printWin.document.write(`<!DOCTYPE html>
@@ -3010,16 +3006,6 @@
 </html>`);
     printWin.document.close();
     printWin.focus();
-    let alreadyPrinted = false;
-    const triggerPrint = () => {
-      if (alreadyPrinted) return;
-      alreadyPrinted = true;
-      printWin.print();
-    };
-    printWin.addEventListener('load', triggerPrint);
-    setTimeout(() => {
-      try { triggerPrint(); } catch (err) { /* la ventana ya pudo haberse cerrado */ }
-    }, 400);
   }
 
   btnPrint.addEventListener('click', runPrintFlow);
