@@ -34,6 +34,29 @@ Cloudflare (`WORKER_URL` dentro del HTML) para verificar la licencia, necesitas
 conexión a internet la primera vez (después, la tolerancia offline de 12 horas
 que ya tenías en el código sigue funcionando igual).
 
+`npm start` usa `scripts/start.js`, que quita la variable `ELECTRON_RUN_AS_NODE`
+antes de lanzar Electron. El terminal de VS Code la define, y con ella la app
+fallaba al arrancar (`Cannot read properties of undefined (reading 'getVersion')`).
+
+Si `npm start` dice *"Electron failed to install correctly"*, es que npm bloqueó el
+script que descarga Electron. Ejecútalo a mano una vez:
+
+```bash
+node node_modules/electron/install.js
+```
+
+## Atajos de teclado
+
+| Atajo | Acción |
+|-------|--------|
+| Ctrl+S | Guardar una nueva versión .doc |
+| Ctrl+P | Abrir el documento en el navegador para imprimir |
+| Ctrl+F / Ctrl+H | Buscar / buscar y reemplazar en el documento |
+| Ctrl+rueda del ratón | Acercar o alejar el documento |
+| Ctrl+B / Ctrl+I / Ctrl+U | Negrita / cursiva / subrayado |
+| Escape | Cerrar la ventana abierta (campo, cargar texto, modelo, aviso) |
+| Ctrl+Enter | Guardar el campo (dentro de "Texto a insertar") |
+
 ## Cómo generar el instalador/ejecutable
 
 ```bash

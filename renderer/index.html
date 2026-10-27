@@ -937,7 +937,6 @@
   .license-status.ok{color:var(--ok);}
 
   /* ---------- Composición del editor ---------- */
-  .brand h1::after{content:'  v1.0.12'; color:var(--text-muted); font-size:.8em; font-weight:500;}
   .topbar-actions .update-toggle{
     display:inline-flex;
     align-items:center;
@@ -963,6 +962,8 @@
   }
   .editor-formatbar button{width:31px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text); font-size:.98rem;}
   .editor-formatbar button:hover:not(:disabled),.editor-formatbar button.active{background:var(--highlight); color:var(--accent);}
+  .editor-formatbar .align-icon{width:16px; height:16px; vertical-align:middle; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round;}
+  .modal .modal-input{margin-top:4px;}
   .editor-formatbar .format-separator{height:24px; width:1px; background:var(--border); margin:0 7px;}
   .editor-formatbar select{height:32px; border:0; background:transparent; color:var(--text); padding:0 7px; font:500 .8rem 'IBM Plex Sans',sans-serif;}
   .editor-formatbar select:focus{outline:2px solid var(--focus); border-radius:4px;}
@@ -992,8 +993,6 @@
   .sidebar-section.collapsed .panel-heading::after{transform:rotate(45deg) translate(-1px,-1px);}
   #templatesList .field-item,.sidebar #fieldsList .field-item{padding:12px;}
   #templatesList .field-item::before{content:'▣'; float:left; margin-right:10px; color:var(--accent); font-size:1.35rem;}
-  #fieldsList::before,#imagesList::before{content:attr(data-summary); display:block; padding:10px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:9px; color:var(--accent); font-size:.78rem; font-weight:600;}
-  #imagesList::before{color:var(--text-muted);}
   @media (max-width:1100px){.topbar-actions .base-name{width:180px;}}
   @media (max-width:700px){.topbar-actions #btnChooseFolder{display:none;}.editor-formatbar{overflow-x:auto;}.editor-footer .footer-tip{max-width:65%;}}
 
@@ -1090,6 +1089,134 @@
   .license-card input[type="text"]:focus{outline:3px solid var(--focus); border-color:var(--accent);}
   .license-card button{height:42px; border-radius:8px;}
   .license-status{color:var(--text-muted);}
+
+  /* ---------- Pulido visual: cabecera, barra de acciones, paneles ---------- */
+  :root{
+    --radius:10px;
+    --accent-soft:rgba(95,141,251,.14);
+    --accent-soft-hover:rgba(95,141,251,.24);
+  }
+  html[data-theme="light"]{
+    --accent-soft:rgba(49,99,232,.09);
+    --accent-soft-hover:rgba(49,99,232,.16);
+  }
+  button:disabled{opacity:.4;}
+  button:focus-visible, select:focus-visible{outline:3px solid var(--focus); outline-offset:1px;}
+
+  /* Cabecera */
+  .topbar{min-height:64px; padding:10px 20px; box-shadow:none;}
+  .brand .mark{width:36px; height:36px; border-radius:9px; box-shadow:none;}
+  .brand .mark::after{font-size:21px; inset:3px 0 0;}
+  .brand h1{display:flex; align-items:baseline; gap:8px;}
+  .brand .sub{display:none;}
+  .app-version{font-size:.72rem; font-weight:500; color:var(--text-faint);}
+  .topbar-actions .update-toggle{border-color:transparent; background:transparent; color:var(--text-muted); font-weight:500;}
+  .topbar-actions .update-toggle:hover:not(:disabled){background:var(--surface-raised); border-color:var(--border);}
+  .topbar-actions .theme-toggle{width:40px; height:40px; padding:0;}
+  .topbar-actions .theme-toggle #themeToggleLabel{display:none;}
+  .base-name-wrap{display:inline-flex; align-items:stretch; height:40px; border:1px solid var(--border-strong); border-radius:8px; background:var(--surface-raised); overflow:hidden; cursor:text;}
+  .base-name-wrap:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px var(--focus);}
+  .base-name-wrap span{display:flex; align-items:center; padding:0 10px; font-size:.75rem; font-weight:600; color:var(--text-muted); background:var(--surface); border-right:1px solid var(--border);}
+  .topbar-actions .base-name-wrap .base-name{height:auto; width:190px; padding:0 10px; border:0; border-radius:0; background:transparent; outline:none;}
+
+  /* Barra de acciones sobre el documento: una sola fila */
+  .toolbar-strip{display:flex; justify-content:space-between; align-items:center; gap:8px; row-gap:8px; flex-wrap:wrap; padding:8px; margin-bottom:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);}
+  .toolbar-strip .left-group, .toolbar-strip .right-group{display:flex; align-items:center; gap:6px;}
+  .toolbar-strip button, .toolbar-strip select.paper-size-select{height:36px; padding:0 12px; font-size:.82rem;}
+  .toolbar-divider{width:1px; height:22px; background:var(--border); margin:0 3px;}
+  .btn-soft{background:var(--accent-soft); color:var(--accent); border-color:transparent;}
+  .btn-soft:hover:not(:disabled){background:var(--accent-soft-hover);}
+  label.landscape-toggle{height:36px; padding:0 10px; border:1px solid var(--border-strong); border-radius:8px; font-size:.82rem; color:var(--text);}
+  label.landscape-toggle input{accent-color:var(--accent); margin:0;}
+
+  /* Documento */
+  .layout{grid-template-columns:260px minmax(480px,1fr) 300px; gap:14px;}
+  .editor-formatbar{position:sticky; top:0; z-index:15; border-radius:var(--radius) var(--radius) 0 0;}
+  .page-wrap .paper{border-radius:0 0 var(--radius) var(--radius); padding:64px 76px;}
+  /* La hoja es siempre clara, así que los campos usan colores fijos (no los del tema). */
+  .paper .campo{color:#2453C9; background:rgba(49,99,232,.10); border-bottom:1.5px solid #3163E8; border-radius:4px; padding:0 4px; -webkit-box-decoration-break:clone; box-decoration-break:clone;}
+  .paper .campo:hover{background:rgba(49,99,232,.18);}
+  .paper .campo.empty-field{color:#9A6412; background:rgba(214,140,20,.12); border-bottom:1.5px dashed #C9861A;}
+
+  /* Paneles laterales */
+  .sidebar{padding:16px;}
+  .sidebar h2{display:flex; align-items:center; gap:8px;}
+  .sidebar .sidebar-sub{margin-bottom:12px;}
+  .panel-heading{cursor:pointer; user-select:none;}
+  .count{display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--accent-soft); color:var(--accent); font-size:.7rem; font-weight:700;}
+  .count.zero{background:var(--surface-raised); color:var(--text-faint); box-shadow:inset 0 0 0 1px var(--border);}
+  .sidebar-head .btn-refresh{width:34px; height:34px; padding:0; justify-content:center;}
+  .no-fields{padding:14px 12px; border:1px dashed var(--border-strong); border-radius:8px; text-align:center; font-size:.8rem;}
+  .field-item, .img-item{transition:border-color .15s ease;}
+  .field-item:hover, .img-item:hover{border-color:var(--border-strong);}
+  .status-block{margin-top:16px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface-raised); line-height:1.5;}
+
+  /* Estado vacío del documento y borrador recuperable */
+  .paper .empty-state{max-width:440px; margin:90px auto 0; text-align:center; font-family:'IBM Plex Sans',sans-serif; color:#5B6475;}
+  .empty-state .empty-icon{display:grid; place-items:center; width:56px; height:56px; margin:0 auto 16px; border-radius:14px; background:rgba(49,99,232,.10); color:#3163E8; font-size:28px;}
+  .empty-state h3{margin:0 0 8px; font-size:1.15rem; color:#1B2233;}
+  .empty-state p{margin:0; font-size:.9rem; line-height:1.6;}
+  .draft-banner{display:flex; flex-direction:column; gap:10px; align-items:center; margin-top:26px; padding:14px 16px; border:1px solid rgba(214,140,20,.45); border-radius:10px; background:rgba(214,140,20,.08); color:#7A4E0B; font-size:.85rem;}
+  .draft-banner[hidden]{display:none;}
+  .draft-banner > div{display:flex; gap:8px;}
+  .draft-banner .btn-panel{background:#fff; color:#1B2233; border-color:#D5D9E2;}
+
+  /* Menú Insertar */
+  .editor-formatbar button.format-wide{width:auto; padding:0 9px; font-size:.8rem; font-weight:600; white-space:nowrap;}
+  .insert-menu-wrap{position:relative;}
+  .insert-menu{display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:30; width:330px; padding:6px; background:var(--surface); border:1px solid var(--border-strong); border-radius:10px; box-shadow:0 16px 40px rgba(0,0,0,.22);}
+  .insert-menu.open{display:block;}
+  .editor-formatbar .insert-menu button{display:block; width:100%; height:auto; padding:8px 10px; text-align:left; border-radius:7px;}
+  .insert-menu button strong{display:block; font-size:.82rem; color:var(--text);}
+  .insert-menu button span{display:block; margin-top:2px; font-size:.74rem; font-weight:400; color:var(--text-muted); white-space:normal; line-height:1.4;}
+
+  /* Buscar y reemplazar */
+  .find-bar{position:sticky; top:50px; z-index:14; display:flex; align-items:center; gap:6px; width:100%; padding:8px 10px; background:var(--surface-raised); border:1px solid var(--border); border-bottom:0;}
+  .find-bar[hidden]{display:none;}
+  .find-bar input{flex:1; min-width:90px; height:32px; padding:0 10px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:.82rem;}
+  .find-bar input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--focus);}
+  .find-bar button{height:32px; min-width:32px; padding:0 8px; background:transparent; border:1px solid transparent; color:var(--text);}
+  .find-bar button:hover{background:var(--highlight); color:var(--accent);}
+  .find-bar .find-text-btn{border-color:var(--border-strong); font-size:.78rem;}
+  .find-count{min-width:70px; font-size:.75rem; color:var(--text-muted); text-align:center;}
+  .find-count.none{color:var(--danger);}
+  ::highlight(rc-find){background-color:rgba(255,196,0,.35);}
+  ::highlight(rc-find-current){background-color:#FF9632; color:#000;}
+
+  /* Panel de campos: rellenar desde el lateral */
+  .fields-progress{margin-bottom:10px; font-size:.75rem; color:var(--text-muted);}
+  .fields-progress .fp-bar{height:5px; margin-top:6px; border-radius:3px; background:var(--border); overflow:hidden;}
+  .fields-progress .fp-bar span{display:block; height:100%; background:#D68C14; border-radius:3px; transition:width .25s ease;}
+  .fields-progress.complete{color:var(--success);}
+  .fields-progress.complete .fp-bar span{background:var(--success);}
+  .field-fill{border-left:3px solid var(--accent);}
+  .field-fill.empty{border-left-color:#D68C14;}
+  .field-fill .f-head{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;}
+  .field-fill .f-head .f-label{margin:0;}
+  .f-times{font-size:.68rem; font-weight:700; color:var(--text-muted); background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:1px 7px;}
+  .f-input{display:block; width:100%; min-height:32px; padding:7px 9px; resize:none; overflow:hidden; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text); font:inherit; font-size:.85rem; line-height:1.4;}
+  .f-input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--focus);}
+  .f-input::placeholder{color:#D68C14; font-style:italic;}
+  .field-fill .f-actions{margin-top:6px; gap:12px;}
+  .link-btn{padding:0; border:0; background:none; color:var(--accent); font-size:.74rem; font-weight:600; cursor:pointer;}
+  .link-btn:hover{text-decoration:underline;}
+  .link-btn.danger{color:var(--danger);}
+  .field-item .f-actions .link-btn{padding:0;}
+  .paper .campo.flash{outline:3px solid #FF9632; outline-offset:2px;}
+  .sub-with-actions{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+  .mini-actions{display:flex; gap:10px; flex-shrink:0;}
+  .field-hint{margin-top:6px; font-size:.75rem; color:var(--accent); min-height:1em;}
+
+  /* Pie: estadísticas */
+  .editor-footer #docStats{gap:6px; flex-wrap:wrap;}
+  .editor-footer .dot-sep{color:var(--text-faint);}
+  .editor-footer .stat-warn{color:#D68C14; font-weight:600;}
+  .editor-footer .stat-ok{color:var(--success); font-weight:600;}
+
+  /* Ventanas */
+  .overlay{background:rgba(8,11,18,.55); backdrop-filter:blur(3px);}
+  .modal{border-radius:14px; box-shadow:0 30px 70px rgba(0,0,0,.35);}
+  .modal .modal-actions .btn-text:hover{color:var(--text);}
 </style>
 </head>
 <body>
@@ -1205,7 +1332,7 @@
   <div class="brand">
     <span class="mark"></span>
     <div>
-      <h1>Redactor de Contratos</h1>
+      <h1>Redactor de Contratos <span class="app-version" id="appVersion"></span></h1>
     </div>
     <span class="sub">Edita y guarda contratos</span>
   </div>
@@ -1216,9 +1343,9 @@
     <button class="btn-ghost theme-toggle" id="btnThemeToggle" title="Cambiar entre tema claro y oscuro">
       <span class="icon" id="themeToggleIcon">☾</span><span id="themeToggleLabel">Oscuro</span>
     </button>
-    <input type="text" class="base-name" id="baseName" placeholder="C:/Documentos/Contratos_Empresa/Actuales/" value="contrato">
+    <label class="base-name-wrap" for="baseName"><span>Archivo</span><input type="text" class="base-name" id="baseName" placeholder="Nombre del archivo (ej: contrato_alquiler)" title="Nombre base de los archivos guardados" value="contrato"></label>
     <button class="btn-ghost" id="btnChooseFolder">Seleccionar carpeta</button>
-    <button class="btn-brass" id="btnSaveNow">Guardar versión .doc</button>
+    <button class="btn-brass" id="btnSaveNow" title="Guardar una nueva versión (Ctrl+S)">Guardar versión .doc</button>
   </div>
 </div>
 
@@ -1227,10 +1354,10 @@
     <div class="sidebar-section">
       <div class="sidebar-head">
         <div>
-          <h2>Archivos de la carpeta</h2>
-          <div class="sidebar-sub">Versiones guardadas</div>
+          <h2>Versiones guardadas</h2>
+          <div class="sidebar-sub">Archivos .doc de la carpeta elegida</div>
         </div>
-        <button class="btn-panel btn-refresh" id="btnRefreshFolderFiles" title="Actualizar lista"><span class="icon">↻</span> Actualizar</button>
+        <button class="btn-panel btn-refresh" id="btnRefreshFolderFiles" title="Actualizar lista" aria-label="Actualizar lista"><span class="icon">↻</span></button>
       </div>
       <input type="text" id="folderFilesSearch" class="search-input" placeholder="Buscar por nombre..." disabled>
       <div id="folderFilesList">
@@ -1242,14 +1369,16 @@
   <div class="page-wrap">
     <div class="toolbar-strip">
       <div class="left-group">
-        <button class="btn-ghost" id="btnLoadText">Cargar texto</button>
-        <button class="btn-brass" id="btnInsertField" disabled>+ Campo</button>
-        <button class="btn-brass" id="btnInsertImage" disabled>+ Imagen</button>
-        <button class="btn-panel" id="btnSaveTemplate" disabled>Guardar como modelo</button>
-        <button class="btn-panel" id="btnPrint" disabled>Imprimir</button>
-        <!-- Selector de tamaño de papel: se usa para generar la vista
-             previa/impresión inicial. Dentro del modal de vista previa
-             se puede seguir ajustando antes de imprimir de verdad. -->
+        <button class="btn-ghost" id="btnLoadText" title="Pegar el texto de un contrato">Cargar texto</button>
+        <span class="toolbar-divider"></span>
+        <button class="btn-soft" id="btnInsertField" title="Insertar un campo rellenable donde está el cursor" disabled>+ Campo</button>
+        <button class="btn-soft" id="btnInsertImage" title="Insertar una imagen donde está el cursor" disabled>+ Imagen</button>
+        <span class="toolbar-divider"></span>
+        <button class="btn-panel" id="btnSaveTemplate" title="Guardar este documento como modelo reutilizable" disabled>Guardar modelo</button>
+      </div>
+      <div class="right-group">
+        <!-- Tamaño de papel y orientación con los que se abre el documento
+             en el navegador al pulsar "Imprimir". -->
         <select class="paper-size-select" id="paperSizeSelect" title="Tamaño de papel">
           <option value="A4" selected>A4</option>
           <option value="Letter">Carta (Letter)</option>
@@ -1262,8 +1391,8 @@
           <input type="checkbox" id="landscapeCheckbox">
           Horizontal
         </label>
+        <button class="btn-panel" id="btnPrint" title="Abre el documento en tu navegador; ahí imprime con Ctrl+P" disabled>Imprimir</button>
       </div>
-      <span class="hint">"Imprimir" abre el documento en tu navegador — usa Ctrl+P ahí para imprimir</span>
     </div>
 
     <div class="editor-formatbar" id="editorFormatbar" aria-label="Formato del documento">
@@ -1276,47 +1405,85 @@
       <span class="format-separator"></span>
       <button type="button" data-command="insertUnorderedList" title="Lista">☷</button>
       <button type="button" data-command="insertOrderedList" title="Lista numerada">☰</button>
-      <button type="button" data-command="justifyLeft" title="Alinear a la izquierda">≡</button>
-      <button type="button" data-command="justifyCenter" title="Centrar">≡</button>
-      <button type="button" data-command="justifyRight" title="Alinear a la derecha">≡</button>
+      <button type="button" data-command="justifyLeft" title="Alinear a la izquierda"><svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h8M2 10h12M2 13.5h8"/></svg></button>
+      <button type="button" data-command="justifyCenter" title="Centrar"><svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M4 6.5h8M2 10h12M4 13.5h8"/></svg></button>
+      <button type="button" data-command="justifyRight" title="Alinear a la derecha"><svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M6 6.5h8M2 10h12M6 13.5h8"/></svg></button>
+      <button type="button" data-command="justifyFull" title="Justificar"><svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12M2 6.5h12M2 10h12M2 13.5h12"/></svg></button>
       <span class="format-separator"></span>
       <button type="button" data-command="createLink" title="Insertar enlace">↗</button>
       <button type="button" id="formatImageButton" title="Insertar imagen">▧</button>
-      <select id="formatFontSelect" title="Fuente"><option value="IBM Plex Sans">Inter</option><option value="Georgia">Georgia</option><option value="Arial">Arial</option></select>
-      <select id="formatSizeSelect" title="Tamaño"><option value="3">14</option><option value="2">12</option><option value="4">16</option><option value="5">18</option></select>
+      <div class="insert-menu-wrap">
+        <button type="button" class="format-wide" id="btnInsertMenu" title="Insertar fecha o cantidad en letras" aria-haspopup="true" aria-expanded="false">Insertar ▾</button>
+        <div class="insert-menu" id="insertMenu" role="menu">
+          <button type="button" role="menuitem" data-insert="date-short"><strong>Fecha de hoy</strong><span id="insertPreviewShort"></span></button>
+          <button type="button" role="menuitem" data-insert="date-legal"><strong>Fecha de hoy en letras</strong><span id="insertPreviewLegal"></span></button>
+          <button type="button" role="menuitem" data-insert="amount"><strong>Cantidad en letras…</strong><span>novecientos con 50/100 (900.50)</span></button>
+          <button type="button" role="menuitem" data-insert="number"><strong>Número en letras…</strong><span>doce (12)</span></button>
+        </div>
+      </div>
+      <button type="button" id="btnFind" title="Buscar y reemplazar (Ctrl+F)"><svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg></button>
+      <select id="formatFontSelect" title="Fuente"><option value="Georgia">Georgia</option><option value="Times New Roman">Times New Roman</option><option value="Arial">Arial</option><option value="IBM Plex Sans">IBM Plex Sans</option></select>
+      <select id="formatSizeSelect" title="Tamaño del texto"><option value="2">Pequeño</option><option value="3" selected>Normal</option><option value="4">Grande</option><option value="5">Muy grande</option></select>
       <label class="format-color" title="Color del texto">A<input type="color" id="formatColorInput" value="#3163E8" aria-label="Elegir color del texto"></label>
-      <button type="button" title="Más opciones">⋮</button>
+    </div>
+
+    <div class="find-bar" id="findBar" hidden>
+      <input type="text" id="findInput" placeholder="Buscar en el documento" autocomplete="off">
+      <span class="find-count" id="findCount"></span>
+      <button type="button" id="findPrev" title="Anterior (Shift+Enter)">↑</button>
+      <button type="button" id="findNext" title="Siguiente (Enter)">↓</button>
+      <input type="text" id="replaceInput" placeholder="Reemplazar por" autocomplete="off">
+      <button type="button" class="find-text-btn" id="replaceOne">Reemplazar</button>
+      <button type="button" class="find-text-btn" id="replaceAll">Todos</button>
+      <button type="button" id="findClose" title="Cerrar (Escape)">×</button>
     </div>
 
     <div class="paper" id="editor" contenteditable="false">
-      <p class="empty-note">Carga un contrato para comenzar.</p>
+      <div class="empty-state">
+        <div class="empty-icon">▤</div>
+        <h3>Empieza un contrato</h3>
+        <p>Pega el texto de un contrato con <strong>Cargar texto</strong>, elige uno de tus <strong>modelos guardados</strong> o abre una versión de tu carpeta.</p>
+        <div class="draft-banner" id="draftBanner" hidden>
+          <span id="draftBannerText">Hay un borrador sin guardar.</span>
+          <div>
+            <button type="button" class="btn-brass" id="draftRestore">Recuperar</button>
+            <button type="button" class="btn-panel" id="draftDiscard">Descartar</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="editor-footer">
-      <div class="footer-tip"><strong>i</strong><span>Selecciona una imagen para ajustarla.</span></div>
+      <div class="footer-tip" id="docStats"><strong>i</strong><span>Haz clic en un campo resaltado para editarlo, o selecciona una imagen para ajustarla.</span></div>
       <div class="zoom-control"><button type="button" id="zoomOut" title="Alejar">−</button><span id="zoomValue">100%</span><button type="button" id="zoomIn" title="Acercar">+</button></div>
     </div>
   </div>
 
   <div class="sidebar">
     <div class="sidebar-section">
-      <div class="panel-heading"><h2>Modelos guardados</h2></div>
-      <div class="sidebar-sub">Reutiliza tus modelos</div>
+      <div class="panel-heading"><h2>Modelos guardados <span class="count" id="templatesCount">0</span></h2></div>
+      <div class="sidebar-sub sub-with-actions">
+        <span>Plantillas que puedes reutilizar</span>
+        <span class="mini-actions">
+          <button type="button" class="link-btn" id="btnExportTemplates" title="Guardar una copia de todos los modelos en un archivo">Exportar</button>
+          <button type="button" class="link-btn" id="btnImportTemplates" title="Añadir modelos desde un archivo exportado">Importar</button>
+        </span>
+      </div>
       <div id="templatesList">
         <div class="no-fields">Todavía no has guardado ningún modelo.</div>
       </div>
     </div>
     <div class="sidebar-section">
-      <div class="panel-heading"><h2>Campos del documento</h2></div>
-      <div class="sidebar-sub">Campos insertados</div>
-      <div id="fieldsList" data-summary="☷  Secciones: 0">
+      <div class="panel-heading"><h2>Campos del documento <span class="count" id="fieldsCount">0</span></h2></div>
+      <div class="sidebar-sub">Rellénalos aquí: los campos con el mismo nombre se actualizan a la vez</div>
+      <div id="fieldsList">
         <div class="no-fields">Todavía no has insertado ningún campo.</div>
       </div>
     </div>
 
     <div class="sidebar-section">
-      <div class="panel-heading"><h2>Imágenes detectadas</h2></div>
-      <div class="sidebar-sub">Imágenes del documento</div>
-      <div id="imagesList" data-summary="▧  Imágenes: 0">
+      <div class="panel-heading"><h2>Imágenes <span class="count" id="imagesCount">0</span></h2></div>
+      <div class="sidebar-sub">Imágenes insertadas en el documento</div>
+      <div id="imagesList">
         <div class="no-fields">Todavía no hay imágenes en el documento.</div>
       </div>
     </div>
@@ -1334,7 +1501,9 @@
     <h3 id="fieldModalTitle">Insertar campo</h3>
     <div class="modal-sub">Completa los datos del campo.</div>
     <label for="fieldLabel">Nombre del campo (referencia interna)</label>
-    <input type="text" id="fieldLabel" placeholder="Ej: Nombre del cliente">
+    <input type="text" id="fieldLabel" placeholder="Ej: Nombre del cliente" list="fieldLabelOptions" autocomplete="off">
+    <datalist id="fieldLabelOptions"></datalist>
+    <div class="field-hint" id="fieldLabelHint"></div>
     <label for="fieldValue">Texto a insertar</label>
     <textarea id="fieldValue" placeholder="Escribe aquí la información que debe aparecer en el contrato"></textarea>
     <div class="modal-actions">
@@ -1378,6 +1547,7 @@
   <div class="modal">
     <h3 id="noticeTitle">Aviso</h3>
     <div class="modal-sub" id="noticeMessage"></div>
+    <input type="text" class="modal-input" id="noticeInput" style="display:none;">
     <div class="modal-actions">
       <button class="btn-text" id="noticeCancelBtn" style="display:none;">Cancelar</button>
       <button class="btn-brass" id="noticeOkBtn">Aceptar</button>
@@ -1386,6 +1556,7 @@
 </div>
 
 <input type="file" id="imageFileInput" accept="image/*" style="display:none">
+<input type="file" id="templatesFileInput" accept=".json,application/json" style="display:none">
 
 <script>
 (function(){
@@ -1423,18 +1594,27 @@
   const zoomValue = document.getElementById('zoomValue');
   let editorZoom = 100;
 
-  function runEditorCommand(command, value){
+  async function runEditorCommand(command, value){
     if (!editor || editor.getAttribute('contenteditable') !== 'true') return;
+    if (command === 'createLink') {
+      // window.prompt() no está soportado en Electron (devuelve null sin
+      // mostrar nada), así que se pide la dirección con el modal propio.
+      const rangeBeforeDialog = savedRange ? savedRange.cloneRange() : null;
+      if (!rangeBeforeDialog || rangeBeforeDialog.collapsed) {
+        await showNotice('Primero selecciona en el documento el texto que quieres convertir en enlace.');
+        return;
+      }
+      let url = await showPromptDialog('Escribe la dirección del enlace.', 'Insertar enlace', 'https://');
+      if (!url || url === 'https://') return;
+      if (!/^(https?:|mailto:)/i.test(url)) url = 'https://' + url;
+      savedRange = rangeBeforeDialog;
+      value = url;
+    }
     editor.focus();
     if (savedRange) {
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(savedRange);
-    }
-    if (command === 'createLink') {
-      const url = window.prompt('Dirección del enlace');
-      if (!url) return;
-      value = url;
     }
     document.execCommand(command, false, value || null);
     editor.dispatchEvent(new Event('input', { bubbles:true }));
@@ -1457,6 +1637,7 @@
     if (!editor) return;
     editor.style.zoom = `${editorZoom / 100}`;
     if (zoomValue) zoomValue.textContent = editorZoom + '%';
+    try { localStorage.setItem('redactorContratos.zoom', String(editorZoom)); } catch (err) { /* no crítico */ }
   }
   if (zoomOut) zoomOut.addEventListener('click', () => { editorZoom = Math.max(60, editorZoom - 10); updateEditorZoom(); });
   if (zoomIn) zoomIn.addEventListener('click', () => { editorZoom = Math.min(140, editorZoom + 10); updateEditorZoom(); });
@@ -1476,41 +1657,43 @@
   const noticeMessage = document.getElementById('noticeMessage');
   const noticeOkBtn = document.getElementById('noticeOkBtn');
   const noticeCancelBtn = document.getElementById('noticeCancelBtn');
+  const noticeInput = document.getElementById('noticeInput');
 
-  function showNotice(message, title){
+  // Un único diálogo para aviso / confirmación / pedir texto.
+  // kind: 'notice' | 'confirm' | 'prompt'. Enter acepta y Escape cancela.
+  // Resuelve: notice → true; confirm → true/false; prompt → texto o null.
+  function openDialog(kind, message, title, defaultValue){
     return new Promise((resolve) => {
-      noticeTitle.textContent = title || 'Aviso';
+      noticeTitle.textContent = title || (kind === 'notice' ? 'Aviso' : 'Confirmar');
       noticeMessage.textContent = message;
-      noticeCancelBtn.style.display = 'none';
-      noticeOkBtn.textContent = 'Aceptar';
+      noticeCancelBtn.style.display = kind === 'notice' ? 'none' : 'inline-block';
+      noticeOkBtn.textContent = kind === 'confirm' ? 'Continuar' : 'Aceptar';
+      noticeInput.style.display = kind === 'prompt' ? 'block' : 'none';
+      noticeInput.value = defaultValue || '';
       noticeOverlay.classList.add('show');
-      function onOk(){ cleanup(); resolve(true); }
-      function cleanup(){
-        noticeOkBtn.removeEventListener('click', onOk);
-        noticeOverlay.classList.remove('show');
-      }
-      noticeOkBtn.addEventListener('click', onOk);
-    });
-  }
-
-  function showConfirmDialog(message, title){
-    return new Promise((resolve) => {
-      noticeTitle.textContent = title || 'Confirmar';
-      noticeMessage.textContent = message;
-      noticeCancelBtn.style.display = 'inline-block';
-      noticeOkBtn.textContent = 'Continuar';
-      noticeOverlay.classList.add('show');
-      function onOk(){ cleanup(); resolve(true); }
-      function onCancel(){ cleanup(); resolve(false); }
-      function cleanup(){
+      if (kind === 'prompt') { noticeInput.focus(); noticeInput.select(); } else { noticeOkBtn.focus(); }
+      function finish(accepted){
         noticeOkBtn.removeEventListener('click', onOk);
         noticeCancelBtn.removeEventListener('click', onCancel);
+        document.removeEventListener('keydown', onKey, true);
         noticeOverlay.classList.remove('show');
+        if (kind === 'prompt') resolve(accepted ? noticeInput.value.trim() : null);
+        else resolve(kind === 'notice' ? true : accepted);
+      }
+      function onOk(){ finish(true); }
+      function onCancel(){ finish(false); }
+      function onKey(e){
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(kind === 'notice'); }
+        else if (e.key === 'Enter' && (kind === 'prompt' || document.activeElement !== noticeCancelBtn)) { e.preventDefault(); e.stopPropagation(); finish(true); }
       }
       noticeOkBtn.addEventListener('click', onOk);
       noticeCancelBtn.addEventListener('click', onCancel);
+      document.addEventListener('keydown', onKey, true);
     });
   }
+  function showNotice(message, title){ return openDialog('notice', message, title); }
+  function showConfirmDialog(message, title){ return openDialog('confirm', message, title); }
+  function showPromptDialog(message, title, defaultValue){ return openDialog('prompt', message, title, defaultValue); }
 
   // ---------- Buscar actualizaciones ----------
   const btnCheckUpdates = document.getElementById('btnCheckUpdates');
@@ -1532,7 +1715,9 @@
       });
 
       if (window.rcUpdater.onStatus) {
-        window.rcUpdater.onStatus(({ status, data }) => {
+        // manual = false cuando la búsqueda la lanzó main.js al arrancar:
+        // en ese caso solo se avisa si de verdad hay una versión nueva.
+        window.rcUpdater.onStatus(({ status, data, manual }) => {
           switch (status) {
             case 'checking':
               setUpdateBusy(true);
@@ -1542,13 +1727,13 @@
             case 'dev-mode':
               setUpdateBusy(false);
               updateBtnLabel.textContent = 'Buscar actualizaciones';
-              showNotice('Estás en modo desarrollo: las actualizaciones automáticas solo funcionan en la app instalada (empaquetada).', 'Modo desarrollo');
+              if (manual) showNotice('Estás en modo desarrollo: las actualizaciones automáticas solo funcionan en la app instalada (empaquetada).', 'Modo desarrollo');
               break;
 
             case 'not-available':
               setUpdateBusy(false);
               updateBtnLabel.textContent = 'Buscar actualizaciones';
-              showNotice('Ya tienes la última versión instalada.', 'Sin novedades');
+              if (manual) showNotice('Ya tienes la última versión instalada.', 'Sin novedades');
               break;
 
             case 'available':
@@ -1571,7 +1756,7 @@
             case 'error':
               setUpdateBusy(false);
               updateBtnLabel.textContent = 'Buscar actualizaciones';
-              showNotice('Error al buscar actualizaciones: ' + (data && data.message ? data.message : 'desconocido'), 'Error');
+              if (manual) showNotice('Error al buscar actualizaciones: ' + (data && data.message ? data.message : 'desconocido'), 'Error');
               break;
           }
         });
@@ -1667,7 +1852,7 @@
   }
 
   function escapeHtml(str){
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   // ---------- Sanitizado ligero del contenido cargado ----------
@@ -2058,7 +2243,18 @@
   loadConfirm.addEventListener('click', () => {
     const clean = sanitizeLoadedHtml(loadRich.innerHTML).trim();
     if (!clean) { loadOverlay.classList.remove('show'); return; }
-    editor.innerHTML = clean;
+    loadDocument(clean);
+    loadOverlay.classList.remove('show');
+    markDirty();
+  });
+
+  // Pone un documento en el editor y deja la interfaz lista para editarlo.
+  // Lo usan "Cargar texto", los modelos, los archivos de la carpeta y la
+  // recuperación del borrador.
+  function loadDocument(html){
+    deselectAllImages();
+    closeFindBar();
+    editor.innerHTML = html;
     editor.setAttribute('contenteditable', 'true');
     hasContent = true;
     btnInsertField.disabled = false;
@@ -2066,10 +2262,10 @@
     btnPrint.disabled = false;
     btnSaveTemplate.disabled = false;
     bindImageWrapperInteractions(editor);
-    loadOverlay.classList.remove('show');
     refreshFieldsList();
     refreshImagesList();
-  });
+    updateDocStats();
+  }
 
   // ---------- Guardar posición del cursor ----------
   document.addEventListener('selectionchange', () => {
@@ -2087,15 +2283,54 @@
       await showNotice('Primero coloca el cursor dentro del documento, en el punto donde quieres insertar el campo.');
       return;
     }
-    editingSpanId = null;
-    fieldModalTitle.textContent = 'Insertar campo';
-    fieldLabel.value = '';
-    fieldValue.value = '';
-    fieldDelete.style.display = 'none';
-    fieldSave.textContent = 'Insertar';
+    openFieldModal(null);
+  });
+
+  // ---------- Campos con el mismo nombre ----------
+  // Un contrato repite los mismos datos (nombre del arrendatario, importe...)
+  // en varios sitios. Los campos con el mismo nombre comparten valor:
+  // al cambiarlo en uno se actualizan todos.
+  const fieldLabelOptions = document.getElementById('fieldLabelOptions');
+  const fieldLabelHint = document.getElementById('fieldLabelHint');
+
+  function normLabel(label){
+    return (label || '').trim().toLowerCase();
+  }
+  function fieldSpansByLabel(label){
+    const n = normLabel(label);
+    return [...editor.querySelectorAll('.campo')].filter(s => normLabel(s.getAttribute('data-label')) === n);
+  }
+  function setFieldValueEverywhere(label, value){
+    fieldSpansByLabel(label).forEach(s => {
+      s.setAttribute('data-value', value);
+      renderFieldContent(s, s.getAttribute('data-label') || label, value);
+    });
+  }
+
+  function openFieldModal(span){
+    editingSpanId = span ? span.id : null;
+    fieldModalTitle.textContent = span ? 'Editar campo' : 'Insertar campo';
+    fieldLabel.value = span ? (span.getAttribute('data-label') || '') : '';
+    fieldValue.value = span ? (span.getAttribute('data-value') || '') : '';
+    fieldDelete.style.display = span ? 'inline-block' : 'none';
+    fieldSave.textContent = span ? 'Guardar cambios' : 'Insertar';
+    const labels = [...new Set([...editor.querySelectorAll('.campo')].map(s => (s.getAttribute('data-label') || '').trim()).filter(Boolean))];
+    fieldLabelOptions.innerHTML = '';
+    labels.forEach(l => { const o = document.createElement('option'); o.value = l; fieldLabelOptions.appendChild(o); });
+    updateFieldLabelHint();
     fieldOverlay.classList.add('show');
     fieldLabel.focus();
-  });
+  }
+
+  // Al escribir un nombre que ya existe, avisa y (si es un campo nuevo)
+  // trae el valor que ya tiene, para no tener que repetirlo.
+  function updateFieldLabelHint(){
+    const others = fieldSpansByLabel(fieldLabel.value).filter(s => s.id !== editingSpanId);
+    if (!fieldLabel.value.trim() || others.length === 0) { fieldLabelHint.textContent = ''; return; }
+    fieldLabelHint.textContent = 'Este nombre ya se usa en ' + others.length + (others.length === 1 ? ' sitio' : ' sitios') + ' del documento: todos tendrán el mismo texto.';
+    if (!editingSpanId && !fieldValue.value) fieldValue.value = others[0].getAttribute('data-value') || '';
+  }
+  fieldLabel.addEventListener('input', updateFieldLabelHint);
 
   // Editar campo existente / eliminar imagen / seleccionar imagen (delegación de eventos)
   editor.addEventListener('click', (e) => {
@@ -2113,14 +2348,7 @@
     }
     const span = e.target.closest('.campo');
     if (!span) return;
-    editingSpanId = span.id;
-    fieldModalTitle.textContent = 'Editar campo';
-    fieldLabel.value = span.getAttribute('data-label') || '';
-    fieldValue.value = span.getAttribute('data-value') || '';
-    fieldDelete.style.display = 'inline-block';
-    fieldSave.textContent = 'Guardar cambios';
-    fieldOverlay.classList.add('show');
-    fieldLabel.focus();
+    openFieldModal(span);
   });
 
   fieldCancel.addEventListener('click', () => fieldOverlay.classList.remove('show'));
@@ -2133,8 +2361,7 @@
       const span = document.getElementById(editingSpanId);
       if (span) {
         span.setAttribute('data-label', label);
-        span.setAttribute('data-value', value);
-        renderFieldContent(span, label, value);
+        setFieldValueEverywhere(label, value);
       }
     } else {
       if (!savedRange) { fieldOverlay.classList.remove('show'); return; }
@@ -2161,6 +2388,7 @@
       } catch(err) {
         editor.appendChild(span);
       }
+      setFieldValueEverywhere(label, value);
     }
 
     fieldOverlay.classList.remove('show');
@@ -2260,56 +2488,111 @@
     }
   });
 
+  // Contador junto al título de cada panel lateral.
+  function setCount(id, n){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n;
+    el.classList.toggle('zero', n === 0);
+  }
+
+  const appVersionEl = document.getElementById('appVersion');
+  if (appVersionEl && window.rcApp && window.rcApp.version) appVersionEl.textContent = 'v' + window.rcApp.version;
+
   // ---------- Panel lateral: campos ----------
+  // Los campos se agrupan por nombre: una sola caja por dato, con un
+  // cuadro de texto que rellena todas sus apariciones a la vez.
+  function getFieldGroups(){
+    const groups = new Map();
+    editor.querySelectorAll('.campo').forEach(span => {
+      const label = (span.getAttribute('data-label') || 'Campo').trim();
+      const key = normLabel(label);
+      if (!groups.has(key)) groups.set(key, { label, value: span.getAttribute('data-value') || '', spans: [] });
+      groups.get(key).spans.push(span);
+    });
+    return [...groups.values()];
+  }
+
+  function updateFieldsProgress(){
+    const groups = getFieldGroups();
+    const done = groups.filter(g => g.value.trim()).length;
+    const el = fieldsListEl.querySelector('.fields-progress');
+    if (!el) return;
+    el.querySelector('.fp-text').textContent = done === groups.length ? 'Todos los campos completos' : (done + ' de ' + groups.length + ' completos');
+    el.querySelector('.fp-bar span').style.width = (groups.length ? (done / groups.length * 100) : 0) + '%';
+    el.classList.toggle('complete', done === groups.length);
+  }
+
+  function autoGrow(textarea){
+    textarea.style.height = 'auto';
+    if (!textarea.scrollHeight) return; // panel plegado: se queda en altura automática
+    textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+  }
+
   function refreshFieldsList(){
-    const spans = editor.querySelectorAll('.campo');
-    fieldsListEl.dataset.summary = '☷  Secciones: ' + spans.length;
-    if (spans.length === 0) {
-      fieldsListEl.innerHTML = '<div class="no-fields">Todavía no has insertado ningún campo.</div>';
+    const groups = getFieldGroups();
+    setCount('fieldsCount', groups.length);
+    if (groups.length === 0) {
+      fieldsListEl.innerHTML = '<div class="no-fields">Todavía no has insertado ningún campo. Coloca el cursor en el texto y pulsa <strong>+ Campo</strong>.</div>';
       return;
     }
-    fieldsListEl.innerHTML = '';
-    spans.forEach(span => {
-      const label = span.getAttribute('data-label') || 'Campo';
-      const value = span.getAttribute('data-value') || '';
+    fieldsListEl.innerHTML = '<div class="fields-progress"><div class="fp-text"></div><div class="fp-bar"><span></span></div></div>';
+    groups.forEach(group => {
       const item = document.createElement('div');
-      item.className = 'field-item';
+      item.className = 'field-item field-fill' + (group.value.trim() ? '' : ' empty');
       item.innerHTML = `
-        <div class="f-label">${escapeHtml(label)}</div>
-        <div class="f-value">${value ? escapeHtml(value) : '<em>(sin completar)</em>'}</div>
+        <div class="f-head">
+          <span class="f-label">${escapeHtml(group.label)}</span>
+          ${group.spans.length > 1 ? `<span class="f-times" title="Aparece ${group.spans.length} veces en el documento">×${group.spans.length}</span>` : ''}
+        </div>
+        <textarea class="f-input" rows="1" placeholder="Sin completar"></textarea>
         <div class="f-actions">
-          <button class="btn-panel" data-act="goto">Ver</button>
-          <button class="btn-panel" data-act="edit">Editar</button>
-          <button class="btn-wine" data-act="del">Eliminar</button>
+          <button class="link-btn" data-act="goto">Ver${group.spans.length > 1 ? ' siguiente' : ''}</button>
+          <button class="link-btn" data-act="edit">Renombrar</button>
+          <button class="link-btn danger" data-act="del">Eliminar</button>
         </div>
       `;
+      const input = item.querySelector('.f-input');
+      input.value = group.value;
+      input.addEventListener('input', () => {
+        setFieldValueEverywhere(group.label, input.value);
+        group.value = input.value;
+        item.classList.toggle('empty', !input.value.trim());
+        autoGrow(input);
+        updateFieldsProgress();
+        markDirty();
+      });
+      let gotoIndex = 0;
       item.querySelector('[data-act="goto"]').addEventListener('click', () => {
+        const live = fieldSpansByLabel(group.label);
+        if (!live.length) return;
+        const span = live[gotoIndex % live.length];
+        gotoIndex++;
         span.scrollIntoView({behavior:'smooth', block:'center'});
-        span.style.outline = '2px solid var(--wine)';
-        setTimeout(() => span.style.outline = '', 900);
+        span.classList.add('flash');
+        setTimeout(() => span.classList.remove('flash'), 1000);
       });
-      item.querySelector('[data-act="edit"]').addEventListener('click', () => {
-        editingSpanId = span.id;
-        fieldModalTitle.textContent = 'Editar campo';
-        fieldLabel.value = label;
-        fieldValue.value = value;
-        fieldDelete.style.display = 'inline-block';
-        fieldSave.textContent = 'Guardar cambios';
-        fieldOverlay.classList.add('show');
-      });
-      item.querySelector('[data-act="del"]').addEventListener('click', () => {
-        span.remove();
+      item.querySelector('[data-act="edit"]').addEventListener('click', () => openFieldModal(group.spans[0]));
+      item.querySelector('[data-act="del"]').addEventListener('click', async () => {
+        const live = fieldSpansByLabel(group.label);
+        if (live.length > 1) {
+          const ok = await showConfirmDialog('El campo "' + group.label + '" aparece ' + live.length + ' veces. ¿Quitarlo de todos los sitios?', 'Eliminar campo');
+          if (!ok) return;
+        }
+        live.forEach(s => s.remove());
         refreshFieldsList();
         markDirty();
       });
       fieldsListEl.appendChild(item);
+      autoGrow(input);
     });
+    updateFieldsProgress();
   }
 
   // ---------- Panel lateral: imágenes ----------
   function refreshImagesList(){
     const wraps = editor.querySelectorAll('.img-wrap');
-    imagesListEl.dataset.summary = '▧  Imágenes: ' + wraps.length;
+    setCount('imagesCount', wraps.length);
     if (wraps.length === 0) {
       imagesListEl.innerHTML = '<div class="no-fields">Todavía no hay imágenes en el documento.</div>';
       return;
@@ -2347,9 +2630,101 @@
 
   editor.addEventListener('input', () => { markDirty(); });
 
+  // Cambios pendientes de guardar en .doc. Se refleja en el título de la
+  // ventana y, si se intenta cerrar la app, main.js pide confirmación
+  // (Electron convierte el beforeunload en el evento will-prevent-unload).
+  const BASE_TITLE = document.title;
+  let isDirty = false;
+
+  let afterEditTimer = null;
+
   function markDirty(){
+    isDirty = true;
     saveStatus.textContent = 'Cambios sin guardar.';
+    document.title = '• ' + BASE_TITLE;
+    // Tareas que no hace falta repetir en cada tecla: se agrupan.
+    clearTimeout(afterEditTimer);
+    afterEditTimer = setTimeout(afterEdit, 800);
   }
+
+  function markClean(message){
+    isDirty = false;
+    clearTimeout(afterEditTimer);
+    if (message) saveStatus.textContent = message;
+    document.title = BASE_TITLE;
+    clearDraft();
+    updateDocStats();
+  }
+
+  let lastFieldCount = 0;
+  function afterEdit(){
+    updateDocStats();
+    saveDraft();
+    // Si se borró o pegó un campo escribiendo en el documento, el panel
+    // se rehace (salvo que se esté escribiendo en él).
+    const count = editor.querySelectorAll('.campo').length;
+    if (count !== lastFieldCount && !fieldsListEl.contains(document.activeElement)) refreshFieldsList();
+    lastFieldCount = count;
+  }
+
+  // ---------- Borrador automático ----------
+  // Mientras haya cambios sin guardar, el documento se copia en este
+  // equipo. Si la app se cierra o se cuelga, al abrirla se ofrece recuperarlo.
+  const DRAFT_KEY = 'redactorContratos.borrador.v1';
+
+  function saveDraft(){
+    if (!hasContent || !isDirty) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ html: editor.innerHTML, baseName: baseNameInput.value, savedAt: new Date().toISOString() }));
+    } catch (err) { /* sin espacio (imágenes muy grandes): no hay borrador, no es crítico */ }
+  }
+  function clearDraft(){
+    try { localStorage.removeItem(DRAFT_KEY); } catch (err) { /* no crítico */ }
+  }
+  function readDraft(){
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      return d && typeof d.html === 'string' && d.html.trim() ? d : null;
+    } catch (err) { return null; }
+  }
+
+  const draftBanner = document.getElementById('draftBanner');
+  const pendingDraft = readDraft();
+  if (pendingDraft && draftBanner) {
+    const when = new Date(pendingDraft.savedAt);
+    document.getElementById('draftBannerText').textContent =
+      'Tienes un borrador sin guardar (' + when.toLocaleDateString() + ', ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')';
+    draftBanner.hidden = false;
+    document.getElementById('draftRestore').addEventListener('click', () => {
+      loadDocument(pendingDraft.html);
+      if (pendingDraft.baseName) baseNameInput.value = pendingDraft.baseName;
+      markDirty();
+      saveStatus.textContent = 'Borrador recuperado. Recuerda guardarlo (Ctrl+S).';
+    });
+    document.getElementById('draftDiscard').addEventListener('click', async () => {
+      const ok = await showConfirmDialog('¿Descartar el borrador? No se podrá recuperar.', 'Descartar borrador');
+      if (!ok) return;
+      clearDraft();
+      draftBanner.hidden = true;
+    });
+  }
+
+  // ---------- Estadísticas del documento (pie del editor) ----------
+  const docStatsEl = document.getElementById('docStats');
+  function updateDocStats(){
+    if (!docStatsEl || !hasContent) return;
+    const text = editor.innerText || '';
+    const words = (text.match(/[\p{L}\p{N}]+(?:[-'’.,][\p{L}\p{N}]+)*/gu) || []).length;
+    const groups = getFieldGroups();
+    const pending = groups.filter(g => !g.value.trim()).length;
+    const minutes = Math.max(1, Math.round(words / 200));
+    docStatsEl.innerHTML = `<span>${words.toLocaleString('es')} palabras</span><span class="dot-sep">·</span><span>${minutes} min de lectura</span>` +
+      (groups.length ? `<span class="dot-sep">·</span><span class="${pending ? 'stat-warn' : 'stat-ok'}">${pending ? pending + (pending === 1 ? ' campo sin completar' : ' campos sin completar') : 'Campos completos'}</span>` : '');
+  }
+
+  window.addEventListener('beforeunload', (e) => {
+    if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+  });
 
   // ---------- Modelos guardados (plantillas reutilizables) ----------
   // Se guardan manualmente en este navegador (localStorage). Seleccionar
@@ -2381,7 +2756,7 @@
   function formatTemplateDate(iso){
     try {
       const d = new Date(iso);
-      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0,5);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (err) {
       return '';
     }
@@ -2389,6 +2764,7 @@
 
   function refreshTemplatesList(){
     const templates = getTemplates();
+    setCount('templatesCount', templates.length);
     if (templates.length === 0) {
       templatesListEl.innerHTML = '<div class="no-fields">Todavía no has guardado ningún modelo.</div>';
       return;
@@ -2419,19 +2795,8 @@
       const ok = await showConfirmDialog('Esto reemplazará el documento que tienes abierto ahora por el modelo "' + tpl.name + '". ¿Continuar?');
       if (!ok) return;
     }
-    deselectAllImages();
-    editor.innerHTML = tpl.html;
-    editor.setAttribute('contenteditable', 'true');
-    hasContent = true;
-    btnInsertField.disabled = false;
-    btnInsertImage.disabled = false;
-    btnPrint.disabled = false;
-    btnSaveTemplate.disabled = false;
-    bindImageWrapperInteractions(editor);
-    refreshFieldsList();
-    refreshImagesList();
-    markDirty();
-    saveStatus.textContent = 'Modelo "' + tpl.name + '" cargado. Los cambios que hagas no afectan al modelo guardado.';
+    loadDocument(tpl.html);
+    markClean('Modelo "' + tpl.name + '" cargado. Los cambios que hagas no afectan al modelo guardado.');
   }
 
   async function deleteTemplate(id){
@@ -2636,7 +3001,8 @@
     let entries = [];
     try {
       for await (const [name, handle] of dirHandle.entries()) {
-        if (handle.kind === 'file' && /\.docx?$/i.test(name)) {
+        // Solo .doc: los .docx son ZIP y no se pueden reabrir aquí.
+        if (handle.kind === 'file' && /\.doc$/i.test(name)) {
           entries.push({ name, handle });
         }
       }
@@ -2726,7 +3092,16 @@
   function stripDangerousTags(html){
     const temp = document.createElement('div');
     temp.innerHTML = html;
-    temp.querySelectorAll('script, style, meta, link, title, head, noscript, object, embed, iframe, xml').forEach(el => el.remove());
+    temp.querySelectorAll('script, style, meta, link, title, head, noscript, object, embed, iframe, xml, form, base, svg, math').forEach(el => el.remove());
+    // Atributos de evento (onerror, onclick...) y URLs javascript: también
+    // ejecutarían código al insertar el HTML en el editor.
+    temp.querySelectorAll('*').forEach(el => {
+      [...el.attributes].forEach(attr => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on')) el.removeAttribute(attr.name);
+        else if (['href', 'src', 'action', 'formaction', 'xlink:href'].includes(name) && /^\s*(javascript|vbscript):/i.test(attr.value)) el.removeAttribute(attr.name);
+      });
+    });
     return temp.innerHTML;
   }
 
@@ -2827,25 +3202,20 @@
     try {
       const file = await fileHandle.getFile();
       const text = await file.text();
+      // Los .doc que genera esta app son HTML. Un .doc binario hecho con
+      // Word no lo es, y abrirlo llenaba el editor de caracteres basura.
+      if (!/<(html|body)[\s>]/i.test(text.slice(0, 4096))) {
+        await showNotice('"' + name + '" no fue creado con el Redactor de Contratos (es un documento de Word normal), así que no se puede abrir aquí. Ábrelo con Word.');
+        return;
+      }
       const bodyHtml = extractBodyFromDocText(text);
       const restored = restoreEditableFromExportedHtml(bodyHtml).trim();
       if (!restored) {
         await showNotice('No se pudo leer contenido de "' + name + '".');
         return;
       }
-      deselectAllImages();
-      editor.innerHTML = restored;
-      editor.setAttribute('contenteditable', 'true');
-      hasContent = true;
-      btnInsertField.disabled = false;
-      btnInsertImage.disabled = false;
-      btnPrint.disabled = false;
-      btnSaveTemplate.disabled = false;
-      bindImageWrapperInteractions(editor);
-      refreshFieldsList();
-      refreshImagesList();
-      markDirty();
-      saveStatus.textContent = 'Documento "' + name + '" abierto desde la carpeta. Puedes seguir editando sus campos.';
+      loadDocument(restored);
+      markClean('Documento "' + name + '" abierto desde la carpeta. Puedes seguir editando sus campos.');
       if (thenPrint) {
         await runPrintFlow();
       }
@@ -2860,22 +3230,28 @@
       await showNotice('Primero carga el texto del contrato.');
       return;
     }
-    versionCount++;
+    if (!(await confirmPendingFields('guardado'))) return;
     const base = (baseNameInput.value.trim() || 'contrato').replace(/[^a-zA-Z0-9_\-]/g, '_');
     const now = new Date();
-    const stamp = now.toISOString().slice(0,16).replace('T','_').replace(':','-');
-    const filename = `${base}_v${versionCount}_${stamp}.doc`;
+    // Fecha/hora local (toISOString da UTC y la hora no coincidía con la del equipo).
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
 
     const cleanHtml = buildExportHtml();
     const blob = buildDocBlob(cleanHtml, base);
 
     if (useDirectAccess && dirHandle) {
       try {
+        // La numeración continúa a partir de la versión más alta que ya
+        // exista en la carpeta para este nombre (antes volvía a v1 en cada
+        // sesión del programa).
+        versionCount = Math.max(versionCount, await highestVersionInFolder(base)) + 1;
+        const filename = `${base}_v${versionCount}_${stamp}.doc`;
         const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
-        saveStatus.textContent = `Guardado "${filename}" a las ${now.toLocaleTimeString()}.`;
+        markClean(`Guardado "${filename}" a las ${now.toLocaleTimeString()}.`);
         refreshFolderFilesList();
         return;
       } catch (err) {
@@ -2886,6 +3262,8 @@
       }
     }
 
+    versionCount++;
+    const filename = `${base}_v${versionCount}_${stamp}.doc`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2894,8 +3272,18 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    saveStatus.textContent = `Descargado "${filename}" a las ${now.toLocaleTimeString()}.`;
+    markClean(`Descargado "${filename}" a las ${now.toLocaleTimeString()}.`);
   });
+
+  async function highestVersionInFolder(base){
+    let highest = 0;
+    const re = new RegExp('^' + base.replace(/[-]/g, '\\-') + '_v(\\d+)_.*\\.doc$', 'i');
+    for await (const name of dirHandle.keys()) {
+      const m = re.exec(name);
+      if (m) highest = Math.max(highest, parseInt(m[1], 10));
+    }
+    return highest;
+  }
 
   function buildExportHtml(){
     const clone = editor.cloneNode(true);
@@ -2944,6 +3332,7 @@
       await showNotice('Primero carga el texto del contrato.');
       return;
     }
+    if (!(await confirmPendingFields('impreso'))) return;
 
     const chosenPageSize = paperSizeSelect ? paperSizeSelect.value : 'A4';
     const chosenLandscape = landscapeCheckbox ? landscapeCheckbox.checked : false;
@@ -2986,7 +3375,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>${title}</title>
+<title>${escapeHtml(title)}</title>
 <style>
   @page { size: ${pageSizeCss}; margin: 2cm; }
   html,body{ margin:0; padding:0; }
@@ -3010,9 +3399,391 @@
 
   btnPrint.addEventListener('click', runPrintFlow);
 
+  // ---------- Números y fechas en letras ----------
+  // Formato habitual en contratos: "novecientos con 50/100 (900.50)" y
+  // "a los veintisiete (27) días del mes de octubre del año dos mil veintiséis (2026)".
+  const UNIDADES = ['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const DECENAS = ['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const CENTENAS = ['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+  function below1000(n){
+    if (n === 100) return 'cien';
+    const c = Math.floor(n / 100), r = n % 100;
+    let out = c ? CENTENAS[c] : '';
+    if (r) {
+      const t = r < 30 ? UNIDADES[r] : DECENAS[Math.floor(r / 10)] + (r % 10 ? ' y ' + UNIDADES[r % 10] : '');
+      out = out ? out + ' ' + t : t;
+    }
+    return out;
+  }
+  // "uno" delante de "mil"/"millones" se apocopa: veintiún mil, un millón.
+  function apocope(s){ return s.replace(/veintiuno$/, 'veintiún').replace(/uno$/, 'un'); }
+  function belowMillion(n){
+    const miles = Math.floor(n / 1000), r = n % 1000;
+    let out = miles ? (miles === 1 ? 'mil' : apocope(below1000(miles)) + ' mil') : '';
+    if (r) out = out ? out + ' ' + below1000(r) : below1000(r);
+    return out;
+  }
+  function numberToWords(n){
+    if (n === 0) return 'cero';
+    const millones = Math.floor(n / 1e6), resto = n % 1e6;
+    const parts = [];
+    if (millones) parts.push(millones === 1 ? 'un millón' : apocope(belowMillion(millones)) + ' millones');
+    if (resto) parts.push(belowMillion(resto));
+    return parts.join(' ');
+  }
+
+  // Acepta "1500", "1,500.50", "1.500,50", "RD$ 900"...
+  function parseAmount(raw){
+    let s = String(raw || '').replace(/[^\d.,]/g, '');
+    if (!s) return NaN;
+    const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+    let decimalSep = '';
+    if (lastComma > -1 && lastDot > -1) decimalSep = lastComma > lastDot ? ',' : '.';
+    else if (lastComma > -1 || lastDot > -1) {
+      const sep = lastComma > -1 ? ',' : '.';
+      const occurrences = s.split(sep).length - 1;
+      const digitsAfter = s.length - s.lastIndexOf(sep) - 1;
+      if (occurrences === 1 && digitsAfter !== 3) decimalSep = sep;
+    }
+    if (decimalSep) {
+      const thousandsSep = decimalSep === ',' ? '.' : ',';
+      s = s.split(thousandsSep).join('').replace(decimalSep, '.');
+    } else {
+      s = s.replace(/[.,]/g, '');
+    }
+    return parseFloat(s);
+  }
+
+  function amountInWords(value){
+    const cents = Math.round(value * 100);
+    const whole = Math.floor(cents / 100), fraction = cents % 100;
+    const formatted = (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return numberToWords(whole) + ' con ' + String(fraction).padStart(2, '0') + '/100 (' + formatted + ')';
+  }
+
+  function todayShort(){
+    const d = new Date();
+    return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
+  }
+  function todayLegal(){
+    const d = new Date();
+    const day = d.getDate();
+    const dayPart = day === 1 ? 'al primer (1) día' : 'a los ' + numberToWords(day) + ' (' + day + ') días';
+    return dayPart + ' del mes de ' + MESES[d.getMonth()] + ' del año ' + numberToWords(d.getFullYear()) + ' (' + d.getFullYear() + ')';
+  }
+
+  // Escribe texto donde estaba el cursor del documento (queda en el
+  // historial de Deshacer como cualquier otra escritura).
+  async function insertTextAtCursor(text){
+    if (!hasContent || !savedRange) {
+      await showNotice('Primero coloca el cursor dentro del documento, en el punto donde quieres insertar el texto.');
+      return;
+    }
+    editor.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    document.execCommand('insertText', false, text);
+  }
+
+  // ---------- Menú "Insertar" de la barra de formato ----------
+  const btnInsertMenu = document.getElementById('btnInsertMenu');
+  const insertMenu = document.getElementById('insertMenu');
+
+  function closeInsertMenu(){
+    insertMenu.classList.remove('open');
+    btnInsertMenu.setAttribute('aria-expanded', 'false');
+  }
+  btnInsertMenu.addEventListener('mousedown', (e) => e.preventDefault());
+  btnInsertMenu.addEventListener('click', () => {
+    const open = !insertMenu.classList.contains('open');
+    if (open) {
+      document.getElementById('insertPreviewShort').textContent = todayShort();
+      document.getElementById('insertPreviewLegal').textContent = todayLegal();
+    }
+    insertMenu.classList.toggle('open', open);
+    btnInsertMenu.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.insert-menu-wrap')) closeInsertMenu();
+  });
+  insertMenu.querySelectorAll('[data-insert]').forEach(item => {
+    item.addEventListener('mousedown', (e) => e.preventDefault());
+    item.addEventListener('click', async () => {
+      closeInsertMenu();
+      const kind = item.dataset.insert;
+      if (kind === 'date-short') return insertTextAtCursor(todayShort());
+      if (kind === 'date-legal') return insertTextAtCursor(todayLegal());
+      const isAmount = kind === 'amount';
+      const rangeBeforeDialog = savedRange ? savedRange.cloneRange() : null;
+      const raw = await showPromptDialog(isAmount ? 'Escribe la cantidad (puede llevar decimales, ej: 15,750.50).' : 'Escribe el número (sin decimales).', isAmount ? 'Cantidad en letras' : 'Número en letras');
+      if (raw == null || raw === '') return;
+      const value = parseAmount(raw);
+      if (!isFinite(value) || value < 0 || value >= 1e12) {
+        await showNotice('"' + raw + '" no es una cantidad válida.');
+        return;
+      }
+      savedRange = rangeBeforeDialog;
+      const intValue = Math.round(value);
+      insertTextAtCursor(isAmount ? amountInWords(value) : numberToWords(intValue) + ' (' + intValue + ')');
+    });
+  });
+
+  // ---------- Buscar y reemplazar ----------
+  // Los resultados se resaltan con la CSS Custom Highlight API, sin
+  // modificar el documento. No se busca dentro de los campos (se editan
+  // desde su panel) ni en las imágenes.
+  const findBar = document.getElementById('findBar');
+  const findInput = document.getElementById('findInput');
+  const replaceInput = document.getElementById('replaceInput');
+  const findCount = document.getElementById('findCount');
+  const canHighlight = typeof Highlight !== 'undefined' && window.CSS && CSS.highlights;
+  let findMatches = [];
+  let findIndex = -1;
+
+  function searchableTextNodes(){
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => node.parentElement && node.parentElement.closest('.campo, .img-wrap, .empty-state') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+
+  function runFind(keepIndex){
+    findMatches = [];
+    const q = findInput.value;
+    if (q && hasContent) {
+      const needle = q.toLocaleLowerCase();
+      searchableTextNodes().forEach(node => {
+        const hay = node.data.toLocaleLowerCase();
+        let i = hay.indexOf(needle);
+        while (i !== -1) {
+          const r = document.createRange();
+          r.setStart(node, i);
+          r.setEnd(node, i + q.length);
+          findMatches.push(r);
+          i = hay.indexOf(needle, i + q.length);
+        }
+      });
+    }
+    if (!keepIndex || findIndex >= findMatches.length || findIndex < 0) findIndex = findMatches.length ? 0 : -1;
+    paintFind(!keepIndex);
+  }
+
+  function paintFind(scroll){
+    if (canHighlight) {
+      CSS.highlights.set('rc-find', new Highlight(...findMatches));
+      CSS.highlights.set('rc-find-current', findIndex >= 0 ? new Highlight(findMatches[findIndex]) : new Highlight());
+    }
+    findCount.textContent = findInput.value ? (findMatches.length ? (findIndex + 1) + ' de ' + findMatches.length : 'Sin resultados') : '';
+    findCount.classList.toggle('none', !!findInput.value && !findMatches.length);
+    if (scroll && findIndex >= 0) {
+      const el = findMatches[findIndex].startContainer.parentElement;
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  function stepFind(delta){
+    if (!findMatches.length) return;
+    findIndex = (findIndex + delta + findMatches.length) % findMatches.length;
+    paintFind(true);
+  }
+
+  function openFindBar(){
+    if (!hasContent) return;
+    findBar.hidden = false;
+    const selected = window.getSelection().toString();
+    if (selected && selected.length < 80 && !selected.includes('\n')) findInput.value = selected;
+    findInput.focus();
+    findInput.select();
+    runFind(false);
+  }
+  function closeFindBar(){
+    if (!findBar || findBar.hidden) return;
+    findBar.hidden = true;
+    findMatches = [];
+    findIndex = -1;
+    if (canHighlight) { CSS.highlights.delete('rc-find'); CSS.highlights.delete('rc-find-current'); }
+  }
+
+  function replaceCurrent(){
+    if (findIndex < 0) return;
+    const range = findMatches[findIndex];
+    // Se reemplaza con la selección + insertText para que Ctrl+Z lo deshaga.
+    editor.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (replaceInput.value) document.execCommand('insertText', false, replaceInput.value);
+    else document.execCommand('delete');
+    runFind(true);
+    paintFind(true);
+    replaceInput.focus();
+  }
+
+  function replaceAll(){
+    if (!findMatches.length) return;
+    const total = findMatches.length;
+    // De atrás hacia delante, para que los rangos pendientes sigan siendo válidos.
+    for (let i = findMatches.length - 1; i >= 0; i--) {
+      const r = findMatches[i];
+      r.deleteContents();
+      if (replaceInput.value) r.insertNode(document.createTextNode(replaceInput.value));
+    }
+    editor.normalize();
+    markDirty();
+    runFind(false);
+    findCount.textContent = total + (total === 1 ? ' reemplazo' : ' reemplazos');
+  }
+
+  document.getElementById('btnFind').addEventListener('click', openFindBar);
+  document.getElementById('findClose').addEventListener('click', closeFindBar);
+  document.getElementById('findNext').addEventListener('click', () => stepFind(1));
+  document.getElementById('findPrev').addEventListener('click', () => stepFind(-1));
+  document.getElementById('replaceOne').addEventListener('click', replaceCurrent);
+  document.getElementById('replaceAll').addEventListener('click', replaceAll);
+  findInput.addEventListener('input', () => runFind(false));
+  findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+  });
+  replaceInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); replaceCurrent(); }
+  });
+  editor.addEventListener('input', () => {
+    if (!findBar.hidden) runFind(true);
+  });
+
+  // ---------- Zoom con Ctrl + rueda (y se recuerda) ----------
+  const ZOOM_KEY = 'redactorContratos.zoom';
+  try {
+    const savedZoom = parseInt(localStorage.getItem(ZOOM_KEY) || '', 10);
+    if (savedZoom >= 60 && savedZoom <= 140) { editorZoom = savedZoom; updateEditorZoom(); }
+  } catch (err) { /* no crítico */ }
+  document.querySelector('.page-wrap').addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    editorZoom = Math.min(140, Math.max(60, editorZoom + (e.deltaY < 0 ? 10 : -10)));
+    updateEditorZoom();
+  }, { passive: false });
+
+  // ---------- Exportar / importar modelos ----------
+  // Los modelos viven en el almacenamiento de esta app; exportarlos a un
+  // archivo sirve de copia de seguridad y para pasarlos a otro equipo.
+  const templatesFileInput = document.getElementById('templatesFileInput');
+
+  document.getElementById('btnExportTemplates').addEventListener('click', async () => {
+    const templates = getTemplates();
+    if (!templates.length) {
+      await showNotice('Todavía no hay modelos guardados que exportar.');
+      return;
+    }
+    const data = { app: 'redactor-contratos', format: 1, exportedAt: new Date().toISOString(), templates };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelos-redactor-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('btnImportTemplates').addEventListener('click', () => {
+    templatesFileInput.value = '';
+    templatesFileInput.click();
+  });
+
+  templatesFileInput.addEventListener('change', async () => {
+    const file = templatesFileInput.files[0];
+    if (!file) return;
+    let incoming;
+    try {
+      const data = JSON.parse(await file.text());
+      incoming = Array.isArray(data) ? data : data.templates;
+      if (!Array.isArray(incoming)) throw new Error('formato');
+    } catch (err) {
+      await showNotice('"' + file.name + '" no es un archivo de modelos exportado desde el Redactor de Contratos.');
+      return;
+    }
+    const existing = getTemplates();
+    let added = 0, skipped = 0;
+    incoming.forEach(t => {
+      if (!t || typeof t.name !== 'string' || typeof t.html !== 'string') { skipped++; return; }
+      const html = stripDangerousTags(t.html);
+      if (existing.some(e => e.name === t.name && e.html === html)) { skipped++; return; }
+      existing.push({
+        id: 'tpl-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+        name: t.name.slice(0, 200),
+        html,
+        savedAt: typeof t.savedAt === 'string' ? t.savedAt : new Date().toISOString()
+      });
+      added++;
+    });
+    if (added && !(await persistTemplates(existing))) return;
+    refreshTemplatesList();
+    await showNotice(added
+      ? 'Se importaron ' + added + (added === 1 ? ' modelo' : ' modelos') + (skipped ? ' (' + skipped + ' ya existían o no eran válidos)' : '') + '.'
+      : 'No se importó ningún modelo nuevo: ya estaban todos guardados.', 'Importar modelos');
+  });
+
+  // ---------- Aviso de campos sin completar ----------
+  async function confirmPendingFields(actionLabel){
+    const pending = getFieldGroups().filter(g => !g.value.trim());
+    if (!pending.length) return true;
+    const names = pending.slice(0, 5).map(g => '"' + g.label + '"').join(', ') + (pending.length > 5 ? '…' : '');
+    return showConfirmDialog(
+      (pending.length === 1 ? 'Hay 1 campo sin completar: ' : 'Hay ' + pending.length + ' campos sin completar: ') + names +
+      '. En el documento ' + actionLabel + ' quedarán en blanco. ¿Continuar de todas formas?',
+      'Campos sin completar');
+  }
+
+  // ---------- Atajos de teclado ----------
+  function appLocked(){
+    const gate = document.getElementById('licenseGate');
+    return !!gate && !gate.classList.contains('gate-hidden');
+  }
+  document.addEventListener('keydown', (e) => {
+    if (appLocked()) return;
+    if (e.key === 'Escape') {
+      const modalOpen = !!document.querySelector('.overlay.show');
+      [fieldOverlay, loadOverlay, templateSaveOverlay].forEach(o => o.classList.remove('show'));
+      closeInsertMenu();
+      if (!modalOpen) closeFindBar();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      const key = e.key.toLowerCase();
+      const modalOpen = !!document.querySelector('.overlay.show');
+      if (key === 's') { e.preventDefault(); if (!modalOpen) btnSaveNow.click(); }
+      else if (key === 'p') { e.preventDefault(); if (!modalOpen && !btnPrint.disabled) runPrintFlow(); }
+      else if (key === 'f' || key === 'h') {
+        e.preventDefault();
+        if (!modalOpen) { openFindBar(); if (key === 'h' && !findBar.hidden) replaceInput.focus(); }
+      }
+    }
+  });
+  templateNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); templateSaveConfirm.click(); }
+  });
+  fieldLabel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); fieldValue.focus(); }
+  });
+  fieldValue.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fieldSave.click(); }
+  });
+
+  // Soltar un archivo fuera del editor hacía que la ventana navegara a
+  // ese archivo, perdiendo el documento abierto.
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => e.preventDefault());
+
   function buildDocBlob(bodyHtml, title){
     const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset="utf-8"><title>${title}</title>
+<head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
 <style>
   body{ font-family:"Georgia","Times New Roman",serif; font-size:12pt; color:#1a1a1a; line-height:1.5; position:relative; }
   p{ margin:0 0 12pt 0; }

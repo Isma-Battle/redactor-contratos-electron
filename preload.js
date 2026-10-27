@@ -15,6 +15,12 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Versión de la app para mostrarla en la cabecera (sale de package.json,
+// así no hay que actualizarla a mano en el HTML en cada release).
+let appVersion = '';
+try { appVersion = String(require('./package.json').version || '').replace(/^v/, ''); } catch (e) { /* no crítico */ }
+contextBridge.exposeInMainWorld('rcApp', { version: appVersion });
+
 contextBridge.exposeInMainWorld('rcUpdater', {
   check: () => ipcRenderer.invoke('rc-check-for-updates'),
   installNow: () => ipcRenderer.invoke('rc-install-update-now'),

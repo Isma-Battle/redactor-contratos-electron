@@ -1,13 +1,13 @@
 {
   "name": "redactor-contratos",
-  "version": "v1.0.12",
+  "version": "v1.0.13",
   "description": "Editor de contratos de escritorio (Electron)",
   "main": "main.js",
   "author": "",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start.js",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
@@ -31,7 +31,6 @@
     "files": [
       "main.js",
       "preload.js",
-      "preview-preload.js",
       "renderer/**/*"
     ],
     "publish": {

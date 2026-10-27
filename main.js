@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, screen, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -46,9 +46,14 @@ writeLog('--- App iniciada. Log en:', logFilePath, '---');
 autoUpdater.autoDownload = false; // descargamos solo cuando el usuario confirma
 autoUpdater.autoInstallOnAppQuit = true;
 
+// true cuando la búsqueda la pidió el usuario con el botón; false en la
+// búsqueda silenciosa del arranque (el renderer no muestra "sin novedades"
+// ni errores de red en ese caso).
+let manualUpdateCheck = false;
+
 function sendUpdateStatus(status, data) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('update-status', { status, data });
+    mainWindow.webContents.send('update-status', { status, data, manual: manualUpdateCheck });
   }
 }
 
@@ -73,6 +78,7 @@ autoUpdater.on('error', (err) => {
 });
 
 ipcMain.handle('rc-check-for-updates', async () => {
+  manualUpdateCheck = true;
   if (!app.isPackaged) {
     // En desarrollo (npm start) no hay instalador que actualizar; evita el error
     // "dev-app-update.yml" que lanza electron-updater fuera de una app empaquetada.
@@ -123,13 +129,18 @@ ipcMain.handle('rc-print', async (event, payload) => {
     return { success: false, error: 'sin-contenido' };
   }
 
+  // pageSize va dentro de una regla CSS: solo se aceptan los valores del selector.
+  if (!['A3', 'A4', 'A5', 'Letter', 'Legal', 'Tabloid'].includes(pageSize)) {
+    return { success: false, error: 'tamaño de papel no válido' };
+  }
   const pageSizeCss = landscape ? `${pageSize} landscape` : pageSize;
+  const safeTitleHtml = rawTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>${rawTitle}</title>
+<title>${safeTitleHtml}</title>
 <style>
   @page { size: ${pageSizeCss}; margin: 2cm; }
   html,body{ margin:0; padding:0; }
@@ -243,12 +254,34 @@ function createWindow() {
   });
 
   // Abre enlaces externos (http/https) en el navegador del sistema, no dentro de la app
+  // Ninguna otra ventana se abre dentro de la app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
-      return { action: 'deny' };
     }
-    return { action: 'allow' };
+    return { action: 'deny' };
+  });
+
+  // La ventana nunca debe salir de index.html (por ejemplo al soltar un
+  // archivo o hacer clic en un enlace): se perdería el documento abierto.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    event.preventDefault();
+    if (url.startsWith('http://') || url.startsWith('https://')) shell.openExternal(url);
+  });
+
+  // El renderer bloquea el cierre (beforeunload) si hay cambios sin
+  // guardar; Electron no muestra diálogo por sí mismo, así que se pregunta aquí.
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      buttons: ['Salir sin guardar', 'Cancelar'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Cambios sin guardar',
+      message: 'Hay cambios en el contrato que no se han guardado.',
+      detail: 'Si sales ahora se perderán. Pulsa "Cancelar" y luego "Guardar versión .doc" (o Ctrl+S) para conservarlos.'
+    });
+    if (choice === 0) event.preventDefault(); // preventDefault aquí = ignorar el beforeunload y cerrar
   });
 
   // Menú mínimo (con recargar y devtools solo en desarrollo)
@@ -300,9 +333,26 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
 
+  // Búsqueda silenciosa de actualizaciones al arrancar (solo en la app
+  // instalada). Si hay versión nueva se descarga y se ofrece reiniciar;
+  // si no, o si no hay red, no se muestra nada.
+  if (app.isPackaged) {
+    setTimeout(() => {
+      manualUpdateCheck = false;
+      autoUpdater.checkForUpdates().catch((err) => writeLog('Búsqueda de actualizaciones al arrancar falló:', err));
+    }, 5000);
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// No dejar el último documento de impresión en la carpeta temporal.
+app.on('will-quit', () => {
+  if (lastPrintFilePath) {
+    try { fs.unlinkSync(lastPrintFilePath); } catch (e) { /* no crítico */ }
+  }
 });
 
 app.on('window-all-closed', () => {
