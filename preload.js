@@ -13,7 +13,7 @@
 // sistema operativo. Desde ahí el usuario imprime con el propio
 // diálogo del navegador (Ctrl+P).
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('rcUpdater', {
   check: () => ipcRenderer.invoke('rc-check-for-updates'),
@@ -26,5 +26,71 @@ contextBridge.exposeInMainWorld('rcUpdater', {
 contextBridge.exposeInMainWorld('rcPrint', {
   // payload: { bodyHtml, pageSize, landscape, title }
   // Devuelve { success: true, filePath } o { success: false, error }.
-  print: (payload) => ipcRenderer.invoke('rc-print', payload)
+  print: (payload) => ipcRenderer.invoke('rc-print', payload),
+  // Mismo payload; pregunta dónde guardar. Devuelve { ok, path, name } o { ok:false, canceled|error }.
+  pdf: (payload) => ipcRenderer.invoke('rc-pdf', payload),
+  openLastPdf: () => ipcRenderer.invoke('rc-pdf-open')
+});
+
+// Carpeta de trabajo del redactor (documentos .doc y subcarpeta Modelos).
+// kind es 'documento' o 'modelo'; name, solo el nombre del archivo.
+contextBridge.exposeInMainWorld('rcFiles', {
+  getFolder: () => ipcRenderer.invoke('rc-folder-get'),
+  chooseFolder: () => ipcRenderer.invoke('rc-folder-choose'),
+  openFolder: () => ipcRenderer.invoke('rc-folder-open'),
+  list: () => ipcRenderer.invoke('rc-folder-list'),
+  read: (kind, name) => ipcRenderer.invoke('rc-folder-read', kind, name),
+  write: (kind, name, text, overwrite) => ipcRenderer.invoke('rc-folder-write', kind, name, text, !!overwrite),
+  trash: (kind, name) => ipcRenderer.invoke('rc-folder-trash', kind, name)
+});
+
+// Expedientes de inquilinos: archivos en <carpeta de trabajo>/Expedientes/<folder>.
+contextBridge.exposeInMainWorld('rcExpediente', {
+  list: (folder) => ipcRenderer.invoke('rc-exp-list', folder),
+  add: (folder) => ipcRenderer.invoke('rc-exp-add', folder),
+  open: (folder, name) => ipcRenderer.invoke('rc-exp-open', folder, name || null),
+  trash: (folder, name) => ipcRenderer.invoke('rc-exp-trash', folder, name)
+});
+
+// Exportar a Excel: sheets = [{ name, columns: [{ header, type, width }], rows }].
+contextBridge.exposeInMainWorld('rcExport', {
+  xlsx: (defaultName, sheets) => ipcRenderer.invoke('rc-export-xlsx', { defaultName, sheets }),
+  openLast: () => ipcRenderer.invoke('rc-export-open')
+});
+
+// Verificación de cédulas con la JCE vía Didit. La clave de API no pasa
+// por aquí salvo al guardarla: se queda cifrada en el proceso principal.
+contextBridge.exposeInMainWorld('rcDidit', {
+  status: () => ipcRenderer.invoke('rc-didit-status'),
+  setKey: (clave) => ipcRenderer.invoke('rc-didit-set-key', clave),
+  removeKey: () => ipcRenderer.invoke('rc-didit-remove-key'),
+  // Comprueba la clave sin gastar consultas: { ok, mensaje } o { ok:false, error }.
+  test: () => ipcRenderer.invoke('rc-didit-test'),
+  // Resultado guardado de una verificación anterior (o null).
+  cached: (cedula) => ipcRenderer.invoke('rc-didit-cached', cedula),
+  // { ok, outcome: 'MATCH'|'NO_MATCH'|..., fecha, datos: { nombre, fechaNacimiento }, desdeCache } o { ok:false, error }
+  verify: (cedula) => ipcRenderer.invoke('rc-didit-verify', cedula)
+});
+
+contextBridge.exposeInMainWorld('rcApp', {
+  version: ipcRenderer.sendSync('rc-app-version'),
+  // Tamaño de la interfaz (Configuración → Apariencia), como el zoom del navegador.
+  setZoom: (factor) => webFrame.setZoomFactor(Math.min(1.5, Math.max(0.75, Number(factor) || 1)))
+});
+
+// Respaldo automático diario de los datos (lo hace main.js al guardar).
+contextBridge.exposeInMainWorld('rcBackup', {
+  // { dir, inWorkFolder, count, keep, last: { name, mtime } | null }
+  status: () => ipcRenderer.invoke('rc-backup-status'),
+  open: () => ipcRenderer.invoke('rc-backup-open')
+});
+
+// Datos de gestión (edificios, apartamentos, inquilinos, contratos),
+// guardados por main.js en un archivo JSON de la carpeta de datos de la app.
+contextBridge.exposeInMainWorld('rcData', {
+  // Devuelve { ok: true, data } (data es null si aún no hay nada guardado)
+  // o { ok: false, error }.
+  load: () => ipcRenderer.invoke('rc-data-load'),
+  // Devuelve { ok: true } o { ok: false, error }.
+  save: (data) => ipcRenderer.invoke('rc-data-save', data)
 });

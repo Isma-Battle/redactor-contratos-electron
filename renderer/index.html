@@ -3,19 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redactor de Contratos</title>
+<title>RentHouse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>
-(function(){
-  // Aplica el tema guardado antes de pintar la página, para evitar
-  // el parpadeo de un tema al otro al recargar.
-  try {
-    var t = localStorage.getItem('redactorContratos.tema');
-    document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
-  } catch (err) { /* si localStorage no está disponible, se queda el tema oscuro por defecto */ }
-})();
-</script>
+<script src="apariencia.js"></script>
 <style>
   :root{
     --ink:#1E2A38;
@@ -70,7 +61,7 @@
     background:var(--chrome-bg);
     background-image: var(--chrome-grad-1), var(--chrome-grad-2);
     color:var(--ink);
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     min-height:100vh;
     transition:background-color .2s ease;
   }
@@ -165,14 +156,14 @@
     color:var(--basename-text);
     border-radius:6px;
     padding:8px 10px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.85rem;
     width:160px;
   }
   input[type="text"].base-name::placeholder{color:var(--basename-placeholder);}
 
   button{
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.85rem;
     font-weight:500;
     border-radius:6px;
@@ -295,7 +286,7 @@
 
   /* Selector de tamaño de papel en la barra de herramientas del editor */
   select.paper-size-select{
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.82rem;
     font-weight:500;
     border-radius:6px;
@@ -376,7 +367,7 @@
   .paper .empty-note{
     color:#9C927B;
     font-style:italic;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.95rem;
   }
 
@@ -543,7 +534,7 @@
     padding:8px 10px;
     border:1px solid var(--line);
     border-radius:7px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.85rem;
     color:var(--ink);
     background:#fff;
@@ -670,7 +661,7 @@
     border:1px solid var(--line);
     border-radius:7px;
     padding:10px 11px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.9rem;
     color:var(--ink);
     resize:vertical;
@@ -701,7 +692,7 @@
     min-height:220px;
     max-height:360px;
     overflow:auto;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.9rem;
     border:1px solid var(--line);
     border-radius:8px;
@@ -733,7 +724,7 @@
     --accent-contrast:#0B111F;
     --success:#33C77B;
     --danger:#FF6B6B;
-    --focus:rgba(95,141,251,0.35);
+    --focus:color-mix(in srgb, var(--accent) 35%, transparent);
     --paper:#FCFCFA;
     --paper-shadow:rgba(0,0,0,0.28);
     --ink:var(--text);
@@ -741,7 +732,7 @@
     --muted:var(--text-muted);
     --line:var(--border);
     --panel:var(--surface);
-    --highlight:rgba(95,141,251,0.18);
+    --highlight:color-mix(in srgb, var(--accent) 18%, transparent);
     --highlight-border:var(--accent);
     --ok:var(--success);
     --wine:var(--danger);
@@ -774,7 +765,7 @@
     --accent-contrast:#FFFFFF;
     --success:#158452;
     --danger:#D6362C;
-    --focus:rgba(49,99,232,0.28);
+    --focus:color-mix(in srgb, var(--accent) 28%, transparent);
     --paper:#FCFCFA;
     --paper-shadow:rgba(27,34,51,0.14);
     --ink:var(--text);
@@ -782,7 +773,7 @@
     --muted:var(--text-muted);
     --line:var(--border);
     --panel:var(--surface);
-    --highlight:rgba(49,99,232,0.10);
+    --highlight:color-mix(in srgb, var(--accent) 10%, transparent);
     --highlight-border:var(--accent);
     --ok:var(--success);
     --wine:var(--danger);
@@ -811,11 +802,11 @@
   .brand .mark{
     width:42px;height:42px;border-radius:11px;
     background:var(--accent);
-    box-shadow:0 6px 14px rgba(49,99,232,0.24);
+    box-shadow:0 6px 14px color-mix(in srgb, var(--accent) 24%, transparent);
     position:relative;
   }
   .brand .mark::after{content:'▤'; color:#fff; font-size:25px; position:absolute; inset:4px 0 0; text-align:center;}
-  .brand h1{font-family:'IBM Plex Sans',sans-serif; font-size:1rem; font-weight:700; color:var(--text);}
+  .brand h1{font-family:var(--font-ui); font-size:1rem; font-weight:700; color:var(--text);}
   .brand .sub{color:var(--text-muted); font-size:0.72rem;}
   .topbar-actions{gap:8px;}
   button{border-radius:8px; padding:9px 13px; font-weight:600;}
@@ -834,7 +825,7 @@
 
   .layout{grid-template-columns:280px minmax(480px,1fr) 330px; gap:12px; max-width:1500px; padding:22px 16px 36px;}
   .sidebar{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px; box-shadow:0 2px 8px rgba(27,34,51,0.04);}
-  .sidebar h2{font-family:'IBM Plex Sans',sans-serif; font-size:0.9rem; font-weight:700; color:var(--text);}
+  .sidebar h2{font-family:var(--font-ui); font-size:0.9rem; font-weight:700; color:var(--text);}
   .sidebar .sidebar-sub{color:var(--text-muted); line-height:1.45;}
   .sidebar-section + .sidebar-section{border-color:var(--border);}
   .sidebar-head .btn-refresh{background:var(--surface); border-color:var(--border-strong); color:var(--accent);}
@@ -851,7 +842,7 @@
   .paper{max-width:100%; min-height:calc(100vh - 190px); padding:60px 66px; border:1px solid var(--border); border-radius:8px; color:#202633; box-shadow:0 14px 34px var(--paper-shadow);}
   .paper:focus{box-shadow:0 14px 34px var(--paper-shadow), 0 0 0 3px var(--focus);}
   .campo{background:var(--highlight); border-color:var(--highlight-border); color:var(--accent);}
-  .campo:hover{background:rgba(49,99,232,0.2);}
+  .campo:hover{background:color-mix(in srgb, var(--accent) 20%, transparent);}
   .img-toolbar{background:var(--surface-raised); border:1px solid var(--border-strong);}
   .img-toolbar button{color:var(--text);}
   .img-toolbar button.active{background:var(--accent); color:#fff;}
@@ -921,7 +912,7 @@
     padding:10px 12px;
     border:1px solid var(--line);
     border-radius:6px;
-    font-family:'IBM Plex Sans', sans-serif;
+    font-family:var(--font-ui);
     font-size:0.9rem;
     margin-bottom:12px;
     box-sizing:border-box;
@@ -937,7 +928,7 @@
   .license-status.ok{color:var(--ok);}
 
   /* ---------- Composición del editor ---------- */
-  .brand h1::after{content:'  v1.0.12'; color:var(--text-muted); font-size:.8em; font-weight:500;}
+  .brand h1 .app-version{margin-left:.4em; color:var(--text-muted); font-size:.8em; font-weight:500;}
   .topbar-actions .update-toggle{
     display:inline-flex;
     align-items:center;
@@ -964,7 +955,7 @@
   .editor-formatbar button{width:31px; height:32px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text); font-size:.98rem;}
   .editor-formatbar button:hover:not(:disabled),.editor-formatbar button.active{background:var(--highlight); color:var(--accent);}
   .editor-formatbar .format-separator{height:24px; width:1px; background:var(--border); margin:0 7px;}
-  .editor-formatbar select{height:32px; border:0; background:transparent; color:var(--text); padding:0 7px; font:500 .8rem 'IBM Plex Sans',sans-serif;}
+  .editor-formatbar select{height:32px; border:0; background:transparent; color:var(--text); padding:0 7px; font:500 .8rem var(--font-ui);}
   .editor-formatbar select:focus{outline:2px solid var(--focus); border-radius:4px;}
   .format-color{position:relative; display:grid; place-items:center; width:31px; height:32px; border-radius:6px; cursor:pointer; color:var(--text); font-weight:700; font-size:.98rem;}
   .format-color:hover{background:var(--highlight); color:var(--accent);}
@@ -992,8 +983,6 @@
   .sidebar-section.collapsed .panel-heading::after{transform:rotate(45deg) translate(-1px,-1px);}
   #templatesList .field-item,.sidebar #fieldsList .field-item{padding:12px;}
   #templatesList .field-item::before{content:'▣'; float:left; margin-right:10px; color:var(--accent); font-size:1.35rem;}
-  #fieldsList::before,#imagesList::before{content:attr(data-summary); display:block; padding:10px 12px; margin-bottom:8px; border:1px solid var(--border); border-radius:9px; color:var(--accent); font-size:.78rem; font-weight:600;}
-  #imagesList::before{color:var(--text-muted);}
   @media (max-width:1100px){.topbar-actions .base-name{width:180px;}}
   @media (max-width:700px){.topbar-actions #btnChooseFolder{display:none;}.editor-formatbar{overflow-x:auto;}.editor-footer .footer-tip{max-width:65%;}}
 
@@ -1001,13 +990,13 @@
   :root{
     --scrollbar-track:#11151C;
     --scrollbar-thumb:#46526A;
-    --scrollbar-thumb-hover:#5F8DFB;
+    --scrollbar-thumb-hover:var(--accent);
     --scrollbar-border:#11151C;
   }
   html[data-theme="light"]{
     --scrollbar-track:#EEF1F6;
     --scrollbar-thumb:#B7C0D0;
-    --scrollbar-thumb-hover:#3163E8;
+    --scrollbar-thumb-hover:var(--accent);
     --scrollbar-border:#EEF1F6;
   }
   html, body, *{
@@ -1044,7 +1033,7 @@
   }
   .license-gate{
     background:var(--bg);
-    background-image:linear-gradient(135deg, rgba(95,141,251,.10), transparent 46%), linear-gradient(315deg, rgba(51,199,123,.06), transparent 42%);
+    background-image:linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 46%), linear-gradient(315deg, rgba(51,199,123,.06), transparent 42%);
     color:var(--text);
     overflow:auto;
   }
@@ -1068,11 +1057,11 @@
     background:var(--accent);
     color:#fff;
     font-size:28px;
-    box-shadow:0 8px 18px rgba(49,99,232,.25);
+    box-shadow:0 8px 18px color-mix(in srgb, var(--accent) 25%, transparent);
   }
   .license-card h2{
     color:var(--text);
-    font-family:'IBM Plex Sans',sans-serif;
+    font-family:var(--font-ui);
     font-size:1.18rem;
     font-weight:700;
     margin-bottom:10px;
@@ -1091,6 +1080,7 @@
   .license-card button{height:42px; border-radius:8px;}
   .license-status{color:var(--text-muted);}
 </style>
+<link rel="stylesheet" href="gestion.css">
 </head>
 <body>
 <div class="license-gate" id="licenseGate">
@@ -1201,142 +1191,757 @@
 </script>
 
 
-<div class="topbar">
+<div class="app-shell">
+<!-- Menú lateral: cambia entre las vistas de gestión y el redactor. -->
+<nav class="side-nav" id="sideNav" aria-label="Menú principal">
   <div class="brand">
     <span class="mark"></span>
     <div>
-      <h1>Redactor de Contratos</h1>
+      <h1>RentHouse<span class="app-version" id="appVersion"></span></h1>
+      <span class="sub">Alquileres y contratos</span>
     </div>
-    <span class="sub">Edita y guarda contratos</span>
   </div>
-  <div class="topbar-actions">
-    <button class="btn-ghost update-toggle" id="btnCheckUpdates" title="Buscar nuevas versiones">
-      <span class="icon" id="updateBtnIcon">⟳</span><span id="updateBtnLabel">Buscar actualizaciones</span>
+
+  <div class="nav-label">Gestión</div>
+  <button type="button" class="nav-item" data-view="resumen" title="Resumen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+    <span>Resumen</span>
+  </button>
+  <button type="button" class="nav-item" data-view="propietarios" title="Propietarios">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1.5A5.5 5.5 0 0 1 10.5 14h3a5.5 5.5 0 0 1 5.5 5.5V21"/><path d="M12 14l-1.2 3.2L12 19l1.2-1.8z"/></svg>
+    <span>Propietarios</span><span class="nav-count" data-count="propietarios"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="edificios" title="Edificios">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M16 9h3a1 1 0 0 1 1 1v11"/><path d="M2 21h20"/><path d="M8 7h4M8 11h4M8 15h4"/></svg>
+    <span>Edificios</span><span class="nav-count" data-count="edificios"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="unidades" title="Apartamentos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+    <span>Apartamentos</span><span class="nav-count" data-count="unidades"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="inquilinos" title="Inquilinos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>
+    <span>Inquilinos</span><span class="nav-count" data-count="inquilinos"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="contratos" title="Contratos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+    <span>Contratos</span><span class="nav-count" data-count="contratos"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="mantenimiento" title="Mantenimiento">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>
+    <span>Mantenimiento</span><span class="nav-count" data-count="reparacionesAbiertas" title="Reparaciones sin resolver"></span>
+  </button>
+
+  <div class="nav-label">Finanzas</div>
+  <button type="button" class="nav-item" data-view="cobros" title="Cobros">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/></svg>
+    <span>Cobros</span><span class="nav-count nav-alert" data-count="atrasados" title="Contratos con pagos atrasados"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="gastos" title="Gastos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+    <span>Gastos</span>
+  </button>
+  <button type="button" class="nav-item" data-view="liquidaciones" title="Liquidaciones">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h13l-3-3"/><path d="M20 17H7l3 3"/><circle cx="12" cy="12" r="2"/></svg>
+    <span>Liquidaciones</span><span class="nav-count" data-count="liquidacionesPendientes" title="Liquidaciones del mes anterior sin transferir"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="balance" title="Balance">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M6 17V11M10 17V6M14 17v-8M18 17V4"/></svg>
+    <span>Balance</span>
+  </button>
+
+  <button type="button" class="nav-item" data-view="reportes" title="Reportes">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/><path d="M8 17v-3M12 17v-5M16 17v-2"/></svg>
+    <span>Reportes</span>
+  </button>
+
+  <div class="nav-label">Legal</div>
+  <button type="button" class="nav-item" data-view="casos" title="Casos de cobro y desalojo">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/></svg>
+    <span>Casos</span><span class="nav-count" data-count="casosAbiertos" title="Casos abiertos"></span>
+  </button>
+  <button type="button" class="nav-item" data-view="agenda" title="Agenda">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2"/></svg>
+    <span>Agenda</span><span class="nav-count nav-alert" data-count="agendaPendiente" title="Pendientes de hoy o atrasados"></span>
+  </button>
+
+  <div class="nav-label">Documentos</div>
+  <button type="button" class="nav-item" data-view="redactor" title="Redactor de contratos">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+    <span>Redactor</span>
+  </button>
+
+  <div class="nav-footer">
+    <button type="button" class="nav-item" data-view="configuracion" title="Configuración">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span>Configuración</span>
     </button>
-    <button class="btn-ghost theme-toggle" id="btnThemeToggle" title="Cambiar entre tema claro y oscuro">
-      <span class="icon" id="themeToggleIcon">☾</span><span id="themeToggleLabel">Oscuro</span>
+    <button type="button" class="nav-item nav-small" id="btnLockNow" title="Bloquear la aplicación ahora" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="16" r="1.2"/></svg>
+      <span>Bloquear ahora</span>
     </button>
-    <input type="text" class="base-name" id="baseName" placeholder="C:/Documentos/Contratos_Empresa/Actuales/" value="contrato">
-    <button class="btn-ghost" id="btnChooseFolder">Seleccionar carpeta</button>
-    <button class="btn-brass" id="btnSaveNow">Guardar versión .doc</button>
+    <button type="button" class="nav-backup" id="backupStatus" hidden>
+      <span class="backup-dot" aria-hidden="true"></span>
+      <span class="backup-text"><span>Respaldo automático</span><strong id="backupStatusText">—</strong></span>
+    </button>
   </div>
+</nav>
+
+<div class="app-main">
+<div class="topbar">
+  <div class="topbar-left">
+    <button type="button" class="btn-ghost icon-btn nav-toggle" id="btnNavToggle" aria-pressed="false" title="Recortar el menú" aria-label="Recortar el menú">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M15 10l-2 2 2 2"/></svg>
+    </button>
+    <h2 class="view-title" id="viewTitle">Resumen</h2>
+  </div>
+  <button type="button" class="topbar-search" id="btnBuscar" title="Buscar en todo (Ctrl+K)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <span>Buscar inquilino, cédula, apartamento...</span><kbd>Ctrl K</kbd>
+  </button>
 </div>
 
-<div class="layout">
-  <div class="sidebar" id="filesSidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-head">
-        <div>
-          <h2>Archivos de la carpeta</h2>
-          <div class="sidebar-sub">Versiones guardadas</div>
-        </div>
-        <button class="btn-panel btn-refresh" id="btnRefreshFolderFiles" title="Actualizar lista"><span class="icon">↻</span> Actualizar</button>
+<!-- ---------- Vistas de gestión ---------- -->
+<section class="view" data-view="resumen" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Resumen</h2><p>Estado general de los inmuebles que administras.</p></div>
+      <div class="mgmt-actions">
+        <button type="button" class="btn-brass" data-new="contrato">+ Nuevo contrato</button>
       </div>
-      <input type="text" id="folderFilesSearch" class="search-input" placeholder="Buscar por nombre..." disabled>
-      <div id="folderFilesList">
-        <div class="no-fields">Selecciona una carpeta</div>
+    </header>
+    <div class="stat-grid" id="dashStats"></div>
+    <div class="mgmt-columns">
+      <div class="mgmt-card">
+        <h3>Requieren atención</h3>
+        <div id="dashAlerts"></div>
+      </div>
+      <div class="mgmt-card">
+        <h3>Ocupación por edificio</h3>
+        <div id="dashBuildings"></div>
       </div>
     </div>
   </div>
+</section>
 
-  <div class="page-wrap">
-    <div class="toolbar-strip">
-      <div class="left-group">
-        <button class="btn-ghost" id="btnLoadText">Cargar texto</button>
-        <button class="btn-brass" id="btnInsertField" disabled>+ Campo</button>
-        <button class="btn-brass" id="btnInsertImage" disabled>+ Imagen</button>
-        <button class="btn-panel" id="btnSaveTemplate" disabled>Guardar como modelo</button>
-        <button class="btn-panel" id="btnPrint" disabled>Imprimir</button>
-        <!-- Selector de tamaño de papel: se usa para generar la vista
-             previa/impresión inicial. Dentro del modal de vista previa
-             se puede seguir ajustando antes de imprimir de verdad. -->
-        <select class="paper-size-select" id="paperSizeSelect" title="Tamaño de papel">
-          <option value="A4" selected>A4</option>
-          <option value="Letter">Carta (Letter)</option>
-          <option value="Legal">Oficio (Legal)</option>
-          <option value="A3">A3</option>
-          <option value="A5">A5</option>
-          <option value="Tabloid">Tabloid</option>
+<section class="view" data-view="propietarios" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Propietarios</h2><p>Dueños de los inmuebles que administras, su comisión y su cuenta para las transferencias.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchPropietarios" placeholder="Buscar por nombre o documento...">
+        <button type="button" class="btn-brass" data-new="propietario">+ Nuevo propietario</button>
+      </div>
+    </header>
+    <div class="mgmt-card table-card" id="tablePropietarios"></div>
+  </div>
+</section>
+
+<section class="view" data-view="edificios" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Edificios</h2><p>Inmuebles que administras y sus propietarios.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchEdificios" placeholder="Buscar edificio...">
+        <button type="button" class="btn-brass" data-new="edificio">+ Nuevo edificio</button>
+      </div>
+    </header>
+    <div class="tile-legend" aria-label="Leyenda de colores">
+      <span class="tile-disponible">Disponible</span>
+      <span class="tile-ocupado">Ocupado</span>
+      <span class="tile-por-vencer">Por vencer</span>
+      <span class="tile-vencido">Vencido</span>
+    </div>
+    <div class="bld-list" id="tableEdificios"></div>
+  </div>
+</section>
+
+<section class="view" data-view="unidades" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Apartamentos</h2><p>Unidades de cada edificio y quién las ocupa.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchUnidades" placeholder="Buscar apartamento...">
+        <select class="mgmt-select" id="filterUnidadesEdificio" title="Filtrar por edificio"></select>
+        <select class="mgmt-select" id="filterUnidadesEstado" title="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option value="disponible">Disponibles</option>
+          <option value="ocupado">Ocupados</option>
         </select>
-        <label class="landscape-toggle" for="landscapeCheckbox">
-          <input type="checkbox" id="landscapeCheckbox">
-          Horizontal
-        </label>
+        <button type="button" class="btn-brass" data-new="unidad">+ Nuevo apartamento</button>
       </div>
-      <span class="hint">"Imprimir" abre el documento en tu navegador — usa Ctrl+P ahí para imprimir</span>
-    </div>
+    </header>
+    <div class="mgmt-card table-card" id="tableUnidades"></div>
+  </div>
+</section>
 
-    <div class="editor-formatbar" id="editorFormatbar" aria-label="Formato del documento">
-      <button type="button" data-command="undo" title="Deshacer">↶</button>
-      <button type="button" data-command="redo" title="Rehacer">↷</button>
-      <span class="format-separator"></span>
-      <button type="button" data-command="bold" title="Negrita"><strong>B</strong></button>
-      <button type="button" data-command="italic" title="Cursiva"><em>I</em></button>
-      <button type="button" data-command="underline" title="Subrayado"><u>U</u></button>
-      <span class="format-separator"></span>
-      <button type="button" data-command="insertUnorderedList" title="Lista">☷</button>
-      <button type="button" data-command="insertOrderedList" title="Lista numerada">☰</button>
-      <button type="button" data-command="justifyLeft" title="Alinear a la izquierda">≡</button>
-      <button type="button" data-command="justifyCenter" title="Centrar">≡</button>
-      <button type="button" data-command="justifyRight" title="Alinear a la derecha">≡</button>
-      <span class="format-separator"></span>
-      <button type="button" data-command="createLink" title="Insertar enlace">↗</button>
-      <button type="button" id="formatImageButton" title="Insertar imagen">▧</button>
-      <select id="formatFontSelect" title="Fuente"><option value="IBM Plex Sans">Inter</option><option value="Georgia">Georgia</option><option value="Arial">Arial</option></select>
-      <select id="formatSizeSelect" title="Tamaño"><option value="3">14</option><option value="2">12</option><option value="4">16</option><option value="5">18</option></select>
-      <label class="format-color" title="Color del texto">A<input type="color" id="formatColorInput" value="#3163E8" aria-label="Elegir color del texto"></label>
-      <button type="button" title="Más opciones">⋮</button>
-    </div>
+<section class="view" data-view="inquilinos" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Inquilinos</h2><p>Personas registradas y sus contratos.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchInquilinos" placeholder="Buscar por nombre o documento...">
+        <button type="button" class="btn-brass" data-new="inquilino">+ Nuevo inquilino</button>
+      </div>
+    </header>
+    <div class="mgmt-card table-card" id="tableInquilinos"></div>
+  </div>
+</section>
 
-    <div class="paper" id="editor" contenteditable="false">
-      <p class="empty-note">Carga un contrato para comenzar.</p>
+<section class="view" data-view="contratos" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Contratos</h2><p>Contratos de alquiler y su documento.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchContratos" placeholder="Buscar inquilino o apartamento...">
+        <select class="mgmt-select" id="filterContratosEstado" title="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option value="activos">Activos</option>
+          <option value="atencion">Vencidos o por vencer</option>
+          <option value="finalizado">Finalizados</option>
+        </select>
+        <button type="button" class="btn-brass" data-new="contrato">+ Nuevo contrato</button>
+      </div>
+    </header>
+    <div class="mgmt-card table-card" id="tableContratos"></div>
+  </div>
+</section>
+
+<section class="view" data-view="mantenimiento" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Mantenimiento</h2><p>Solicitudes de reparación de apartamentos y áreas comunes.</p></div>
+      <div class="mgmt-actions">
+        <select class="mgmt-select" id="mntEstado" title="Filtrar por estado">
+          <option value="abiertas">Sin resolver</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="proceso">En proceso</option>
+          <option value="resuelta">Resueltas</option>
+          <option value="">Todas</option>
+        </select>
+        <select class="mgmt-select" id="mntEdificio" title="Filtrar por edificio"></select>
+        <button type="button" class="btn-brass" data-new="reparacion">+ Nueva solicitud</button>
+      </div>
+    </header>
+    <div class="mgmt-card table-card" id="tableReparaciones"></div>
+  </div>
+</section>
+
+<!-- ---------- Legal ---------- -->
+<section class="view" data-view="casos" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Casos de cobro y desalojo</h2><p>Etapas, requisitos, fechas y actos de cada proceso.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchCasos" placeholder="Buscar inquilino, tribunal o expediente...">
+        <select class="mgmt-select" id="filterCasosEstado" title="Filtrar por estado">
+          <option value="abiertos">Abiertos</option>
+          <option value="cerrados">Cerrados</option>
+          <option value="">Todos</option>
+        </select>
+        <button type="button" class="btn-brass" data-new="caso">+ Nuevo caso</button>
+      </div>
+    </header>
+    <div class="mgmt-card table-card" id="tableCasos"></div>
+  </div>
+</section>
+
+<section class="view" data-view="agenda" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Agenda</h2><p>Audiencias, plazos, citas y vencimientos de contratos.</p></div>
+      <div class="mgmt-actions">
+        <button type="button" class="btn-brass" data-new="evento">+ Nuevo evento</button>
+      </div>
+    </header>
+    <div class="ag-layout">
+      <div class="mgmt-card ag-cal-card">
+        <div class="ag-cal-head">
+          <button type="button" class="btn-panel icon-btn" id="agendaPrev" title="Mes anterior" aria-label="Mes anterior">‹</button>
+          <h3 id="agendaMesLabel"></h3>
+          <button type="button" class="btn-panel icon-btn" id="agendaNext" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+          <button type="button" class="btn-panel" id="agendaHoy">Hoy</button>
+        </div>
+        <div class="ag-cal" id="agendaCal"></div>
+        <div class="ag-leyenda">
+          <span><i class="ag-audiencia"></i>Audiencia</span><span><i class="ag-plazo"></i>Plazo</span><span><i class="ag-cita"></i>Cita</span>
+          <span><i class="ag-tarea"></i>Tarea</span><span><i class="ag-vencimiento"></i>Vence un contrato</span><span><i class="ag-aumento"></i>Aumento</span>
+        </div>
+      </div>
+      <div class="mgmt-card ag-lista-card" id="agendaLista"></div>
     </div>
-    <div class="editor-footer">
-      <div class="footer-tip"><strong>i</strong><span>Selecciona una imagen para ajustarla.</span></div>
-      <div class="zoom-control"><button type="button" id="zoomOut" title="Alejar">−</button><span id="zoomValue">100%</span><button type="button" id="zoomIn" title="Acercar">+</button></div>
+  </div>
+</section>
+
+<!-- ---------- Finanzas ---------- -->
+<section class="view" data-view="cobros" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Cobros</h2><p>Cuotas mensuales de los inquilinos y pagos recibidos.</p></div>
+      <div class="mgmt-actions">
+        <div class="month-stepper">
+          <button type="button" class="btn-panel" id="cobrosPrev" title="Mes anterior" aria-label="Mes anterior">‹</button>
+          <input type="month" class="mgmt-select mgmt-month" id="cobrosMes" title="Mes">
+          <button type="button" class="btn-panel" id="cobrosNext" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+        </div>
+        <select class="mgmt-select" id="cobrosEdificio" title="Filtrar por edificio"></select>
+        <button type="button" class="btn-panel" id="btnLote" title="Enviar recordatorios a todos los inquilinos con atraso">Recordar a los atrasados</button>
+        <button type="button" class="btn-brass" data-new="pago">+ Registrar pago</button>
+      </div>
+    </header>
+    <div class="stat-grid" id="cobrosStats"></div>
+    <h3 class="section-title" id="cobrosCuotasTitulo">Cuotas del mes</h3>
+    <div class="mgmt-card table-card" id="cobrosCuotas"></div>
+    <h3 class="section-title">Pagos registrados para este mes</h3>
+    <div class="mgmt-card table-card" id="cobrosPagos"></div>
+  </div>
+</section>
+
+<section class="view" data-view="gastos" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Gastos</h2><p>Reparaciones, servicios de áreas comunes y demás gastos de los edificios.</p></div>
+      <div class="mgmt-actions">
+        <input type="search" class="search-input mgmt-search" id="searchGastos" placeholder="Buscar concepto o proveedor...">
+        <select class="mgmt-select" id="gastosEdificio" title="Filtrar por edificio"></select>
+        <select class="mgmt-select" id="gastosCategoria" title="Filtrar por categoría"></select>
+        <select class="mgmt-select" id="gastosMes" title="Filtrar por mes"></select>
+        <button type="button" class="btn-brass" data-new="gasto">+ Nuevo gasto</button>
+      </div>
+    </header>
+    <div class="stat-grid" id="gastosStats"></div>
+    <div class="mgmt-card table-card" id="gastosTabla" style="margin-top:14px;"></div>
+  </div>
+</section>
+
+<section class="view" data-view="liquidaciones" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Liquidaciones</h2><p>Lo que corresponde transferir a cada propietario: cobrado − gastos − comisión.</p></div>
+      <div class="mgmt-actions">
+        <div class="month-stepper">
+          <button type="button" class="btn-panel" id="liqPrev" title="Mes anterior" aria-label="Mes anterior">‹</button>
+          <input type="month" class="mgmt-select mgmt-month" id="liqMes" title="Mes">
+          <button type="button" class="btn-panel" id="liqNext" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+        </div>
+        <select class="mgmt-select" id="liqPropietario" title="Filtrar por propietario"></select>
+        <button type="button" class="btn-panel" id="btnEnvioEstados" title="Estados de cuenta del mes para enviar a los propietarios">Enviar estados de cuenta</button>
+      </div>
+    </header>
+    <div class="stat-grid" id="liqStats"></div>
+    <h3 class="section-title" id="liqTitulo">Liquidaciones del mes</h3>
+    <div class="mgmt-card table-card" id="liqTabla"></div>
+    <p class="mgmt-note">Se cuenta lo cobrado en el mes (por la fecha de cada pago) y los gastos con fecha del mes. Los gastos de áreas comunes se cargan al propietario del edificio; los de un apartamento, a su propietario.</p>
+  </div>
+</section>
+
+<section class="view" data-view="balance" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Balance</h2><p>Ingresos cobrados frente a gastos, por mes.</p></div>
+      <div class="mgmt-actions">
+        <select class="mgmt-select" id="balanceAnio" title="Año"></select>
+        <select class="mgmt-select" id="balanceMoneda" title="Moneda"></select>
+        <select class="mgmt-select" id="balanceEdificio" title="Filtrar por edificio"></select>
+      </div>
+    </header>
+    <div class="stat-grid" id="balanceStats"></div>
+    <div class="mgmt-card viz" style="margin-top:14px;">
+      <div class="chart-head">
+        <h3>Ingresos y gastos por mes</h3>
+        <div class="chart-legend">
+          <span><i class="sw sw-ing"></i>Ingresos</span>
+          <span><i class="sw sw-gas"></i>Gastos</span>
+        </div>
+      </div>
+      <div id="balanceChart"></div>
+    </div>
+    <div class="mgmt-columns">
+      <div class="mgmt-card viz">
+        <h3>Gastos por categoría</h3>
+        <div id="balanceCategorias"></div>
+      </div>
+      <div class="mgmt-card">
+        <h3>Por edificio</h3>
+        <div id="balanceEdificios"></div>
+      </div>
+    </div>
+    <h3 class="section-title">Detalle mensual</h3>
+    <div class="mgmt-card table-card" id="balanceTabla"></div>
+  </div>
+</section>
+
+<section class="view" data-view="reportes" hidden>
+  <div class="mgmt">
+    <header class="mgmt-head">
+      <div><h2>Reportes</h2><p>Morosidad por antigüedad, depósitos en custodia y exportación a Excel.</p></div>
+      <div class="mgmt-actions">
+        <select class="mgmt-select" id="repEdificio" title="Filtrar por edificio"></select>
+        <select class="mgmt-select" id="repMoneda" title="Moneda"></select>
+      </div>
+    </header>
+    <div class="stat-grid" id="repStats"></div>
+    <h3 class="section-title">Morosidad por antigüedad</h3>
+    <div class="mgmt-card table-card" id="repMorosidad"></div>
+    <p class="mgmt-note">Cada cuota vencida y sin pagar se clasifica por los días que lleva vencida. Incluye los recargos por mora.</p>
+    <div class="mgmt-columns">
+      <div class="mgmt-card">
+        <h3>Depósitos en custodia</h3>
+        <div id="repDepositos"></div>
+      </div>
+      <div class="mgmt-card">
+        <h3>Exportar a Excel</h3>
+        <p class="mgmt-note" style="margin:0 0 12px;">Un libro .xlsx con una hoja por tema: pagos, gastos, morosidad, contratos, inquilinos, propietarios, apartamentos y liquidaciones. Útil para el contador.</p>
+        <div class="export-row">
+          <label class="footer-field">Pagos, gastos y liquidaciones de
+            <select class="mgmt-select" id="repAnio"></select>
+          </label>
+          <button type="button" class="btn-brass" data-act="exportar-excel" data-id="">Exportar a Excel</button>
+        </div>
+        <div class="export-status" id="repExportStatus"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- Configuración ---------- -->
+<section class="view" data-view="configuracion" hidden>
+  <div class="mgmt mgmt-config">
+    <header class="mgmt-head">
+      <div><h2>Configuración</h2><p>Preferencias de la aplicación. Los cambios se guardan solos.</p></div>
+      <span class="cfg-guardado" id="cfgGuardado" aria-live="polite"></span>
+    </header>
+
+    <div class="cfg-grid">
+      <section class="mgmt-card cfg-card cfg-wide" id="cfgApariencia">
+        <div class="cfg-card-head">
+          <div><h3>Apariencia</h3><p class="cfg-desc">Se recuerda en este equipo y se aplica al momento.</p></div>
+          <button type="button" class="btn-panel" data-ap-reset title="Volver a la apariencia original">Restablecer</button>
+        </div>
+        <div class="cfg-ap-grid">
+          <div class="cfg-row">
+            <div><strong>Tema</strong><span>"Sistema" sigue el modo claro u oscuro de Windows.</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Tema">
+              <button type="button" class="seg-tab" data-ap="tema" data-valor="dark">☾ Oscuro</button>
+              <button type="button" class="seg-tab" data-ap="tema" data-valor="light">☀ Claro</button>
+              <button type="button" class="seg-tab" data-ap="tema" data-valor="system">Sistema</button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Color de acento</strong><span id="cfgAcentoNombre">Botones, enlaces y selección.</span></div>
+            <div class="cfg-swatches" role="group" aria-label="Color de acento">
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="azul" style="--sw:#4A79F2" title="Azul" aria-label="Azul"></button>
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="turquesa" style="--sw:#14A797" title="Turquesa" aria-label="Turquesa"></button>
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="violeta" style="--sw:#8A5CF0" title="Violeta" aria-label="Violeta"></button>
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="vino" style="--sw:#C2416A" title="Vino" aria-label="Vino"></button>
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="dorado" style="--sw:#C38A2B" title="Dorado" aria-label="Dorado"></button>
+              <button type="button" class="cfg-swatch" data-ap="acento" data-valor="grafito" style="--sw:#6B7585" title="Grafito" aria-label="Grafito"></button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Tamaño de la interfaz</strong><span>Agranda o achica textos, botones y tablas.</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Tamaño de la interfaz">
+              <button type="button" class="seg-tab" data-ap="escala" data-valor="0.9">90%</button>
+              <button type="button" class="seg-tab" data-ap="escala" data-valor="1">100%</button>
+              <button type="button" class="seg-tab" data-ap="escala" data-valor="1.1">110%</button>
+              <button type="button" class="seg-tab" data-ap="escala" data-valor="1.25">125%</button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Densidad</strong><span>"Compacta" muestra más filas en pantalla.</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Densidad">
+              <button type="button" class="seg-tab" data-ap="densidad" data-valor="comoda">Cómoda</button>
+              <button type="button" class="seg-tab" data-ap="densidad" data-valor="compacta">Compacta</button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Fuente</strong><span>Letra de menús, tablas y formularios (no de los documentos).</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Fuente">
+              <button type="button" class="seg-tab" data-ap="fuente" data-valor="plex" style="font-family:'IBM Plex Sans',sans-serif">Plex</button>
+              <button type="button" class="seg-tab" data-ap="fuente" data-valor="sistema" style="font-family:'Segoe UI',sans-serif">Segoe UI</button>
+              <button type="button" class="seg-tab" data-ap="fuente" data-valor="serif" style="font-family:'Source Serif 4',serif">Serif</button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Animaciones</strong><span>Transiciones al cambiar de sección y abrir ventanas.</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Animaciones">
+              <button type="button" class="seg-tab" data-ap="animaciones" data-valor="si">Activadas</button>
+              <button type="button" class="seg-tab" data-ap="animaciones" data-valor="no">Reducidas</button>
+            </div>
+          </div>
+          <div class="cfg-row">
+            <div><strong>Menú lateral</strong><span>Completo o recortado (solo íconos).</span></div>
+            <div class="seg-tabs cfg-seg" role="group" aria-label="Menú lateral">
+              <button type="button" class="seg-tab" data-cfg-menu="completo">Completo</button>
+              <button type="button" class="seg-tab" data-cfg-menu="recortado">Recortado</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card cfg-wide">
+        <h3>Despacho</h3>
+        <p class="cfg-desc">Aparece en recibos, estados de cuenta y recordatorios de pago.</p>
+        <div class="cfg-fields">
+          <label class="cfg-field"><span>Nombre del despacho o administración</span>
+            <input type="text" data-ajuste="despacho" placeholder="Ej: Bufete García &amp; Asociados"></label>
+          <label class="cfg-field"><span>Teléfono de contacto</span>
+            <input type="tel" data-ajuste="despachoTelefono" placeholder="809-000-0000"></label>
+          <label class="cfg-field"><span>Firma de los recordatorios de pago</span>
+            <input type="text" data-ajuste="firma" placeholder="La administración"></label>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card cfg-wide">
+        <h3>Valores predeterminados</h3>
+        <p class="cfg-desc">Se proponen al crear contratos, gastos y propietarios nuevos; en cada uno se pueden cambiar.</p>
+        <div class="cfg-fields">
+          <label class="cfg-field"><span>Moneda</span>
+            <select data-ajuste="moneda"><option>RD$</option><option>US$</option><option>€</option><option>$</option></select></label>
+          <label class="cfg-field"><span>Día de pago</span>
+            <input type="number" min="1" max="31" step="1" data-ajuste="diaPago" data-tipo="numero"></label>
+          <label class="cfg-field"><span>Duración de los contratos (meses)</span>
+            <input type="number" min="1" max="120" step="1" data-ajuste="duracionMeses" data-tipo="numero"></label>
+          <label class="cfg-field"><span>Aviso de vencimiento (días antes)</span>
+            <input type="number" min="1" max="180" step="1" data-ajuste="avisoDias" data-tipo="numero"></label>
+          <label class="cfg-field"><span>Recargo por mora</span>
+            <select data-ajuste="moraTipo"><option value="ninguna">Sin recargo</option><option value="porcentaje">Porcentaje de la cuota</option><option value="fijo">Monto fijo</option></select></label>
+          <label class="cfg-field"><span>Valor del recargo</span>
+            <input type="number" min="0" step="0.01" data-ajuste="moraValor" data-tipo="numero" placeholder="Ej: 5"></label>
+          <label class="cfg-field"><span>Días de gracia</span>
+            <input type="number" min="0" max="60" step="1" data-ajuste="moraGracia" data-tipo="numero"></label>
+          <label class="cfg-field"><span>Comisión de propietarios nuevos</span>
+            <select data-ajuste="comisionTipo"><option value="porcentaje">Porcentaje de lo cobrado</option><option value="fijo">Monto fijo mensual</option><option value="ninguna">Sin comisión</option></select></label>
+          <label class="cfg-field"><span>Valor de la comisión</span>
+            <input type="number" min="0" step="0.01" data-ajuste="comisionValor" data-tipo="numero" placeholder="Ej: 10"></label>
+          <label class="cfg-field"><span>Papel para imprimir</span>
+            <select data-ajuste="papel"><option value="Letter">Carta</option><option value="A4">A4</option><option value="Legal">Oficio</option></select></label>
+          <label class="cfg-field"><span>Recibos y estados de cuenta</span>
+            <select data-ajuste="salida"><option value="navegador">Abrir en el navegador para imprimir</option><option value="pdf">Guardar como PDF</option></select></label>
+          <label class="cfg-field"><span>ITBIS sobre la comisión (%)</span>
+            <input type="number" min="0" max="100" step="0.01" data-ajuste="itbisComision" data-tipo="numero" placeholder="Vacío: no se aplica"></label>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card">
+        <h3>Datos y respaldos</h3>
+        <div class="cfg-row">
+          <div><strong>Carpeta de trabajo</strong><span id="cfgCarpeta">—</span></div>
+          <button type="button" class="btn-panel" data-cfg-accion="carpeta">Cambiar</button>
+        </div>
+        <div class="cfg-row">
+          <div><strong>Respaldo automático</strong><span id="cfgRespaldo">—</span></div>
+          <button type="button" class="btn-panel" data-cfg-accion="respaldos">Abrir carpeta</button>
+        </div>
+        <div class="cfg-row">
+          <div><strong>Copia manual</strong><span>Un archivo con todos los datos, para guardarlo o pasarlo a otro equipo.</span></div>
+          <div class="cfg-btns">
+            <button type="button" class="btn-panel" id="btnExportData">Exportar</button>
+            <button type="button" class="btn-panel" id="btnImportData">Importar…</button>
+          </div>
+          <input type="file" id="importDataInput" accept=".json,application/json" hidden>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card">
+        <h3>Integraciones</h3>
+        <div class="cfg-row">
+          <div><strong>Verificación de cédulas con la JCE (Didit)</strong><span id="cfgDidit">—</span></div>
+          <button type="button" class="btn-panel" data-didit-open>Configurar</button>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card">
+        <h3>Seguridad</h3>
+        <div class="cfg-row">
+          <div><strong>PIN de acceso</strong><span id="cfgPin">—</span></div>
+          <button type="button" class="btn-panel" id="btnPinSettings">Configurar</button>
+        </div>
+      </section>
+
+      <section class="mgmt-card cfg-card">
+        <h3>Actualizaciones</h3>
+        <div class="cfg-row">
+          <div><strong>RentHouse <span id="cfgVersion"></span></strong><span>Busca y descarga la nueva versión desde GitHub.</span></div>
+          <button class="btn-panel update-toggle" id="btnCheckUpdates" title="Buscar nuevas versiones">
+            <span class="icon" id="updateBtnIcon">⟳</span><span id="updateBtnLabel">Buscar actualizaciones</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+
+<section class="view" data-view="redactor" hidden>
+<!-- Redactor: espacio de trabajo a pantalla completa.
+     Barra de documento | barra de formato | panel lateral + escritorio con la página real | pie. -->
+<div class="rd-shell" id="rdShell">
+  <div class="rd-toolbar">
+    <button type="button" class="btn-panel icon-btn" id="rdPanelToggle" title="Mostrar u ocultar el panel lateral" aria-label="Mostrar u ocultar el panel lateral" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+    <label class="rd-docname" title="Nombre con el que se guarda el documento">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+      <input type="text" id="baseName" value="contrato" placeholder="Nombre del documento" autocomplete="off" aria-label="Nombre del documento">
+    </label>
+    <span class="rd-status" id="saveStatus">Ningún guardado todavía.</span>
+    <div class="rd-actions">
+      <button type="button" class="btn-panel" id="btnLoadText" title="Pegar el texto de un contrato">Cargar texto</button>
+      <button type="button" class="btn-panel" id="btnSaveTemplate" disabled title="Guardar este documento como modelo reutilizable">Guardar como modelo</button>
+      <button type="button" class="btn-panel" id="btnPrint" disabled title="Abrir en el navegador para imprimir (Ctrl+P)">Imprimir</button>
+      <button type="button" class="btn-panel" id="btnPdf" disabled title="Guardar el documento como PDF">PDF</button>
+      <button type="button" class="btn-brass" id="btnSaveNow" title="Guardar una versión .doc en la carpeta de trabajo (Ctrl+S)">Guardar .doc</button>
     </div>
   </div>
 
-  <div class="sidebar">
-    <div class="sidebar-section">
-      <div class="panel-heading"><h2>Modelos guardados</h2></div>
-      <div class="sidebar-sub">Reutiliza tus modelos</div>
-      <div id="templatesList">
-        <div class="no-fields">Todavía no has guardado ningún modelo.</div>
-      </div>
-    </div>
-    <div class="sidebar-section">
-      <div class="panel-heading"><h2>Campos del documento</h2></div>
-      <div class="sidebar-sub">Campos insertados</div>
-      <div id="fieldsList" data-summary="☷  Secciones: 0">
-        <div class="no-fields">Todavía no has insertado ningún campo.</div>
-      </div>
-    </div>
+  <!-- Aparece cuando el documento abierto pertenece a un contrato registrado. -->
+  <div class="contract-link-bar" id="contractLinkBar" hidden>
+    <span class="link-icon" aria-hidden="true">⛓</span>
+    <span class="link-text" id="contractLinkText"></span>
+    <button type="button" class="btn-panel" id="btnLinkFill" title="Volver a rellenar los campos con los datos del contrato">Rellenar datos</button>
+    <button type="button" class="btn-brass" id="btnLinkSave">Guardar en el contrato</button>
+    <button type="button" class="btn-text" id="btnLinkClose" title="Dejar de asociar este documento al contrato">Desvincular</button>
+  </div>
 
-    <div class="sidebar-section">
-      <div class="panel-heading"><h2>Imágenes detectadas</h2></div>
-      <div class="sidebar-sub">Imágenes del documento</div>
-      <div id="imagesList" data-summary="▧  Imágenes: 0">
-        <div class="no-fields">Todavía no hay imágenes en el documento.</div>
+  <div class="rd-body">
+    <!-- Panel lateral: biblioteca (documentos y modelos) y campos del documento. -->
+    <aside class="rd-side" id="rdSide" aria-label="Biblioteca y campos">
+      <div class="seg-tabs rd-tabs" role="tablist">
+        <button type="button" role="tab" class="seg-tab active" data-lib-tab="documentos" aria-selected="true">Documentos <span class="seg-count" id="libCountDocs"></span></button>
+        <button type="button" role="tab" class="seg-tab" data-lib-tab="modelos" aria-selected="false">Modelos <span class="seg-count" id="libCountModelos"></span></button>
+        <button type="button" role="tab" class="seg-tab" data-lib-tab="campos" aria-selected="false">Campos <span class="seg-count" id="libCountCampos"></span></button>
       </div>
-    </div>
 
-    <div class="status-block" id="statusBlock">
-      <div><span class="dot" id="folderDot"></span><span id="folderStatus">Sin carpeta de guardado seleccionada.</span></div>
-      <div style="margin-top:6px;" id="saveStatus">Ningún guardado todavía.</div>
+      <div class="rd-panel" data-rd-panel="biblioteca">
+        <div class="rd-folder" id="folderChip">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <strong id="folderName">Sin elegir</strong>
+          <button type="button" class="icon-x rd-mini" id="btnOpenFolder" title="Abrir la carpeta en el explorador" aria-label="Abrir la carpeta en el explorador" disabled>↗</button>
+          <button type="button" class="link-btn" id="btnChooseFolder">Elegir carpeta</button>
+        </div>
+        <div class="lib-search-row">
+          <input type="search" id="folderFilesSearch" class="search-input" placeholder="Buscar documento...">
+          <button type="button" class="btn-panel icon-btn" id="btnRefreshFolderFiles" title="Actualizar la lista" aria-label="Actualizar la lista">↻</button>
+        </div>
+        <div class="lib-list" id="folderFilesList"></div>
+        <p class="lib-hint" id="libHint"></p>
+      </div>
+
+      <div class="rd-panel" data-rd-panel="campos" hidden>
+        <div class="rd-panel-head">
+          <span id="fieldsSummary">Sin campos</span>
+          <button type="button" class="link-btn" data-rd-insertar-campo>+ Campo</button>
+        </div>
+        <div class="rd-fields" id="fieldsList"></div>
+        <div class="rd-panel-head rd-panel-head-sub"><span>Imágenes</span><span class="seg-count" id="imagesCount"></span></div>
+        <div class="rd-images" id="imagesList"></div>
+      </div>
+    </aside>
+
+    <div class="rd-center">
+      <div class="editor-formatbar" id="editorFormatbar" aria-label="Formato del documento">
+        <button type="button" class="fmt-pill" id="btnInsertField" disabled title="Insertar un campo en el cursor">+ Campo</button>
+        <button type="button" class="fmt-pill" id="btnInsertImage" disabled title="Insertar una imagen en el cursor">+ Imagen</button>
+        <span class="format-separator"></span>
+        <button type="button" data-command="undo" title="Deshacer (Ctrl+Z)">↶</button>
+        <button type="button" data-command="redo" title="Rehacer (Ctrl+Y)">↷</button>
+        <span class="format-separator"></span>
+        <select id="formatBlockSelect" title="Estilo del párrafo">
+          <option value="p">Párrafo</option>
+          <option value="h1">Título</option>
+          <option value="h2">Subtítulo</option>
+          <option value="h3">Encabezado</option>
+        </select>
+        <select id="formatFontSelect" title="Fuente">
+          <option value="Source Serif 4">Serif (documento)</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Arial">Arial</option>
+          <option value="Calibri">Calibri</option>
+        </select>
+        <select id="formatSizeSelect" title="Tamaño de letra">
+          <option value="2">10</option>
+          <option value="3" selected>12</option>
+          <option value="4">14</option>
+          <option value="5">18</option>
+          <option value="6">24</option>
+        </select>
+        <span class="format-separator"></span>
+        <button type="button" data-command="bold" title="Negrita (Ctrl+B)"><strong>B</strong></button>
+        <button type="button" data-command="italic" title="Cursiva (Ctrl+I)"><em>I</em></button>
+        <button type="button" data-command="underline" title="Subrayado (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-command="strikeThrough" title="Tachado"><s>S</s></button>
+        <label class="format-color" title="Color del texto">A<input type="color" id="formatColorInput" value="#1B2233" aria-label="Elegir color del texto"></label>
+        <span class="format-separator"></span>
+        <button type="button" data-command="justifyLeft" title="Alinear a la izquierda"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button>
+        <button type="button" data-command="justifyCenter" title="Centrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button>
+        <button type="button" data-command="justifyRight" title="Alinear a la derecha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button>
+        <button type="button" data-command="justifyFull" title="Justificar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg></button>
+        <span class="format-separator"></span>
+        <button type="button" data-command="insertUnorderedList" title="Lista con viñetas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/><path d="M9 7h11M9 12h11M9 17h11"/></svg></button>
+        <button type="button" data-command="insertOrderedList" title="Lista numerada"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v4M4 9h3M4 14h3l-3 4h3M10 7h10M10 12h10M10 17h10"/></svg></button>
+        <button type="button" data-command="outdent" title="Reducir sangría"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M11 10h9M11 14h9M4 18h16M7 10l-3 2 3 2"/></svg></button>
+        <button type="button" data-command="indent" title="Aumentar sangría"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M11 10h9M11 14h9M4 18h16M4 10l3 2-3 2"/></svg></button>
+        <span class="format-separator"></span>
+        <button type="button" data-command="createLink" title="Insertar enlace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+        <button type="button" data-command="removeFormat" title="Quitar formato"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M12 5l-3 14M4 20l16-16"/></svg></button>
+        <button type="button" id="btnPageBreak" title="Insertar salto de página"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v5h12V3M6 21v-5h12v5M3 12h3M9 12h2M13 12h2M18 12h3"/></svg></button>
+      </div>
+
+      <div class="rd-desk" id="rdDesk">
+        <!-- Pantalla de inicio mientras no hay documento -->
+        <div class="rd-empty" id="rdEmpty">
+          <h3>Empieza un documento</h3>
+          <p>Escribe desde cero, pega el texto de un contrato o parte de un modelo guardado.</p>
+          <div class="rd-empty-actions">
+            <button type="button" class="rd-start" data-rd-start="blanco"><strong>Documento en blanco</strong><span>Escribe directamente en la página.</span></button>
+            <button type="button" class="rd-start" data-rd-start="texto"><strong>Cargar texto</strong><span>Pega el texto (y las imágenes) de un contrato.</span></button>
+            <button type="button" class="rd-start" data-rd-start="modelo"><strong>Usar un modelo</strong><span>Elige uno de tus modelos guardados.</span></button>
+          </div>
+        </div>
+        <div class="paper" id="editor" contenteditable="false" hidden></div>
+      </div>
+
+      <div class="editor-footer">
+        <span class="rd-stats" id="rdStats"></span>
+        <div class="footer-controls">
+          <label class="footer-field" title="Tamaño del papel (página que ves y que se imprime)">Papel
+            <select id="paperSizeSelect">
+              <option value="Letter" selected>Carta</option>
+              <option value="A4">A4</option>
+              <option value="Legal">Oficio</option>
+              <option value="A3">A3</option>
+              <option value="A5">A5</option>
+              <option value="Tabloid">Tabloid</option>
+            </select>
+          </label>
+          <label class="footer-field" for="landscapeCheckbox"><input type="checkbox" id="landscapeCheckbox"> Horizontal</label>
+          <div class="zoom-control">
+            <button type="button" id="zoomOut" title="Alejar">−</button>
+            <span id="zoomValue">100%</span>
+            <button type="button" id="zoomIn" title="Acercar">+</button>
+            <button type="button" class="zoom-fit" id="zoomFit" title="Ajustar la página al ancho disponible">Ajustar</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+</section>
+</div><!-- /.app-main -->
+</div><!-- /.app-shell -->
 
 <!-- Modal: insertar/editar campo -->
 <div class="overlay" id="fieldOverlay">
   <div class="modal">
     <h3 id="fieldModalTitle">Insertar campo</h3>
-    <div class="modal-sub">Completa los datos del campo.</div>
+    <div class="modal-sub">Completa los datos del campo. Si usas un nombre de la lista (p. ej. "Nombre del inquilino"), se rellenará solo con los datos del contrato.</div>
     <label for="fieldLabel">Nombre del campo (referencia interna)</label>
-    <input type="text" id="fieldLabel" placeholder="Ej: Nombre del cliente">
+    <input type="text" id="fieldLabel" placeholder="Ej: Nombre del inquilino" list="fieldLabelSuggestions" autocomplete="off">
+    <datalist id="fieldLabelSuggestions"></datalist>
     <label for="fieldValue">Texto a insertar</label>
     <textarea id="fieldValue" placeholder="Escribe aquí la información que debe aparecer en el contrato"></textarea>
+    <label class="check-item check-single" id="fieldApplyAllWrap" hidden><input type="checkbox" id="fieldApplyAll" checked> <span id="fieldApplyAllText"></span></label>
     <div class="modal-actions">
       <button class="btn-text" id="fieldCancel">Cancelar</button>
       <button class="btn-wine" id="fieldDelete" style="display:none;">Eliminar campo</button>
@@ -1363,12 +1968,221 @@
 <div class="overlay" id="templateSaveOverlay">
   <div class="modal">
     <h3>Guardar como modelo</h3>
-    <div class="modal-sub">Guarda una copia reutilizable del documento.</div>
+    <div class="modal-sub">Se guarda en la subcarpeta "Modelos" de tu carpeta de trabajo, para reutilizarlo en otros contratos.</div>
     <label for="templateNameInput">Nombre del modelo</label>
     <input type="text" id="templateNameInput" placeholder="Ej: Contrato de arrendamiento">
     <div class="modal-actions">
       <button class="btn-text" id="templateSaveCancel">Cancelar</button>
       <button class="btn-brass" id="templateSaveConfirm">Guardar modelo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: formulario de gestión (edificio, apartamento, inquilino o
+     contrato). gestion.js genera los campos según lo que se edite. -->
+<div class="overlay" id="mgmtFormOverlay">
+  <div class="modal modal-form">
+    <h3 id="mgmtFormTitle">Nuevo registro</h3>
+    <div class="modal-sub" id="mgmtFormSub"></div>
+    <form id="mgmtForm" novalidate>
+      <div class="form-grid" id="mgmtFormFields"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-text" id="mgmtFormCancel">Cancelar</button>
+        <button type="submit" class="btn-brass" id="mgmtFormSave">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: ficha del inquilino con sus contratos -->
+<div class="overlay" id="tenantDetailOverlay">
+  <div class="modal modal-wide">
+    <div id="tenantDetailBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-text" id="tenantDetailClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="tenantDetailEdit">Editar datos</button>
+      <button type="button" class="btn-brass" id="tenantDetailNewContract">+ Nuevo contrato</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ficha de un caso de cobro o desalojo -->
+<div class="overlay" id="casoOverlay">
+  <div class="modal modal-wide">
+    <div id="casoBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-text danger-text" id="casoBorrar">Eliminar</button>
+      <span class="actions-spacer"></span>
+      <button type="button" class="btn-text" id="casoClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="casoEditar">Editar datos</button>
+      <button type="button" class="btn-panel" id="casoCerrar">Cerrar caso…</button>
+      <button type="button" class="btn-brass" id="casoRedactar">Redactar acto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: elegir el modelo con el que redactar el documento de un contrato -->
+<div class="overlay" id="templatePickerOverlay">
+  <div class="modal modal-form">
+    <h3>Redactar documento del contrato</h3>
+    <div class="modal-sub" id="templatePickerSub">Elige un modelo. Los campos con nombres reconocidos se rellenan solos con los datos del contrato.</div>
+    <div class="pick-list" id="templatePickerList"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-text" id="templatePickerCancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: recordatorio de pago por WhatsApp o correo -->
+<div class="overlay" id="reminderOverlay">
+  <div class="modal modal-form">
+    <h3 id="reminderTitulo">Recordatorio de pago</h3>
+    <div class="modal-sub" id="reminderSub"></div>
+    <label for="reminderText">Mensaje (puedes editarlo antes de enviarlo)</label>
+    <textarea id="reminderText" rows="10"></textarea>
+    <div class="reminder-contacts" id="reminderContacts"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-text" id="reminderClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="reminderCopy">Copiar</button>
+      <button type="button" class="btn-panel" id="reminderEmail">Enviar por correo</button>
+      <button type="button" class="btn-brass" id="reminderWhatsApp">Enviar por WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: estados de cuenta del mes a los propietarios -->
+<div class="overlay" id="envioOverlay">
+  <div class="modal modal-form modal-lote">
+    <h3 id="envioTitulo">Estados de cuenta</h3>
+    <div class="modal-sub" id="envioSub"></div>
+    <div class="lote-lista" id="envioLista"></div>
+    <p class="mgmt-note">"PDF" guarda el estado de cuenta; WhatsApp y correo envían un resumen (adjunta el PDF en el mensaje) y lo marcan como enviado.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-text" id="envioClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="envioTodos">Todos en un PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: acta de entrega o devolución del inmueble -->
+<div class="overlay" id="actaOverlay">
+  <div class="modal modal-wide">
+    <div class="detail-head">
+      <div><h3 id="actaTitulo">Acta de entrega</h3><div class="modal-sub" id="actaSub"></div></div>
+      <label class="acta-fecha">Fecha<input type="date" id="actaFecha"></label>
+    </div>
+    <div class="acta-tabla-wrap">
+      <table class="data-table acta-tabla">
+        <thead><tr><th>Área</th><th>Elemento</th><th id="actaColEntrega">Al entregar</th><th>Estado</th><th>Observación</th><th></th></tr></thead>
+        <tbody id="actaItems"></tbody>
+      </table>
+    </div>
+    <div class="acta-pie-tabla"><button type="button" class="link-btn" id="actaAddItem">+ Añadir elemento</button><span id="actaResumen" class="mgmt-note"></span></div>
+    <div class="acta-campos">
+      <label>Lectura de luz<input type="text" id="acta-luz"></label>
+      <label>Lectura de agua<input type="text" id="acta-agua"></label>
+      <label>Lectura de gas<input type="text" id="acta-gas"></label>
+      <label>Llaves entregadas<input type="number" min="0" step="1" id="acta-llaves"></label>
+      <label class="full">Observaciones<textarea id="actaObs" rows="2"></textarea></label>
+    </div>
+    <div class="acta-fotos-head"><strong>Fotos</strong><button type="button" class="btn-panel" id="actaFotosAdd">Adjuntar fotos…</button></div>
+    <div class="acta-fotos" id="actaFotos"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-text danger-text" id="actaBorrar">Eliminar</button>
+      <span class="actions-spacer"></span>
+      <button type="button" class="btn-text" id="actaClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="actaDeposito" title="Guardar y descontar desperfectos del depósito">Depósito…</button>
+      <button type="button" class="btn-panel" id="actaImprimir">Imprimir</button>
+      <button type="button" class="btn-brass" id="actaGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: recordatorios en lote -->
+<div class="overlay" id="loteOverlay">
+  <div class="modal modal-form modal-lote">
+    <h3>Recordatorios de pago</h3>
+    <div class="modal-sub" id="loteSub"></div>
+    <div class="lote-lista" id="loteLista"></div>
+    <p class="mgmt-note">Cada botón abre WhatsApp o el correo con el mensaje listo; el envío se anota en el seguimiento del inquilino. "Ver mensaje" permite editarlo antes.</p>
+    <div class="modal-actions"><button type="button" class="btn-text" id="loteClose">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Búsqueda global (Ctrl+K) -->
+<div class="overlay overlay-top" id="buscarOverlay">
+  <div class="modal busca-modal" role="dialog" aria-label="Buscar">
+    <div class="busca-input"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input type="search" id="buscarInput" placeholder="Buscar en inquilinos, propietarios, apartamentos, contratos, casos..." autocomplete="off"></div>
+    <div class="busca-lista" id="buscarResultados"></div>
+    <div class="busca-pie"><span><kbd>↑</kbd><kbd>↓</kbd> moverse</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Esc</kbd> cerrar</span></div>
+  </div>
+</div>
+
+<!-- Pantalla de bloqueo con PIN (seguridad.js) -->
+<div class="license-gate pin-lock" id="pinLock" hidden>
+  <div class="license-card">
+    <h2>RentHouse está bloqueado</h2>
+    <p id="pinLockMsg">Introduce tu PIN para continuar.</p>
+    <input type="password" id="pinLockInput" inputmode="numeric" autocomplete="off" maxlength="64" placeholder="PIN">
+    <button type="button" class="btn-brass" id="pinLockBtn">Desbloquear</button>
+    <div class="license-status" id="pinLockStatus"></div>
+    <button type="button" class="link-btn pin-forgot" id="pinForgot">¿Olvidaste el PIN? Usa tu clave de licencia</button>
+  </div>
+</div>
+
+<!-- Modal: configurar el PIN de acceso -->
+<div class="overlay" id="pinSetupOverlay">
+  <div class="modal">
+    <h3>PIN de acceso</h3>
+    <div class="modal-sub">Pide un PIN al abrir la aplicación y tras un rato sin uso. Protege el acceso en este equipo; los datos no se cifran, así que protege también tu usuario de Windows.</div>
+    <div id="pinCurrentWrap">
+      <label for="pinCurrent">PIN actual</label>
+      <input type="password" id="pinCurrent" inputmode="numeric" autocomplete="off" maxlength="12">
+    </div>
+    <label for="pinNew" id="pinNewLabel">PIN nuevo (4 a 12 dígitos)</label>
+    <input type="password" id="pinNew" inputmode="numeric" autocomplete="off" maxlength="12">
+    <label for="pinNew2">Repite el PIN nuevo</label>
+    <input type="password" id="pinNew2" inputmode="numeric" autocomplete="off" maxlength="12">
+    <label for="pinAuto">Bloquear tras un rato sin uso</label>
+    <select id="pinAuto">
+      <option value="0">Nunca</option>
+      <option value="5">5 minutos</option>
+      <option value="15" selected>15 minutos</option>
+      <option value="30">30 minutos</option>
+      <option value="60">1 hora</option>
+    </select>
+    <div class="modal-actions">
+      <button type="button" class="btn-wine" id="pinRemove">Quitar PIN</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn-text" id="pinSetupCancel">Cancelar</button>
+      <button type="button" class="btn-brass" id="pinSetupSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: verificación de cédulas con la JCE (Didit) -->
+<div class="overlay" id="diditOverlay">
+  <div class="modal modal-form">
+    <h3>Verificación de cédulas con la JCE</h3>
+    <div class="modal-sub">Usa el servicio de Didit, que consulta el registro de la JCE y confirma si la cédula existe. Si el registro devuelve el nombre, se propone para completar el formulario. La cédula se envía a Didit solo cuando pulsas "Verificar con la JCE". Didit cobra cada consulta con resultado y exige una primera recarga de saldo para activar este servicio; revisa sus precios en su web.</div>
+    <div class="didit-status" id="diditStatus"></div>
+    <div class="didit-prueba" id="diditPrueba" aria-live="polite"></div>
+    <ol class="didit-pasos">
+      <li>Crea tu cuenta en Didit (botón <b>Abrir Didit</b>) y haz la primera recarga de saldo.</li>
+      <li>En su consola, copia tu <b>API key</b>.</li>
+      <li>Pégala aquí y pulsa <b>Guardar clave</b> (se guarda cifrada en este equipo). Con <b>Probar clave</b> compruebas que funciona sin gastar consultas.</li>
+    </ol>
+    <label for="diditKey">Clave de API (API key)</label>
+    <input type="password" id="diditKey" autocomplete="off" placeholder="Pega aquí tu clave de Didit">
+    <p class="mgmt-note">Las cédulas ya verificadas se recuerdan en este equipo y no vuelven a consumir consultas.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-wine" id="diditRemove">Quitar clave</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn-text" id="diditClose">Cerrar</button>
+      <button type="button" class="btn-panel" id="diditWeb">Abrir Didit</button>
+      <button type="button" class="btn-panel" id="diditTest">Probar clave</button>
+      <button type="button" class="btn-brass" id="diditSave">Guardar clave</button>
     </div>
   </div>
 </div>
@@ -1389,29 +2203,6 @@
 
 <script>
 (function(){
-  // ---------- Tema claro / oscuro ----------
-  const THEME_KEY = 'redactorContratos.tema';
-  const htmlRoot = document.documentElement;
-  const btnThemeToggle = document.getElementById('btnThemeToggle');
-  const themeToggleIcon = document.getElementById('themeToggleIcon');
-  const themeToggleLabel = document.getElementById('themeToggleLabel');
-
-  function applyTheme(theme){
-    htmlRoot.setAttribute('data-theme', theme);
-    if (themeToggleIcon) themeToggleIcon.textContent = theme === 'light' ? '☀' : '☾';
-    if (themeToggleLabel) themeToggleLabel.textContent = theme === 'light' ? 'Claro' : 'Oscuro';
-    try { localStorage.setItem(THEME_KEY, theme); } catch (err) { /* no crítico */ }
-  }
-  // El <head> ya aplicó el tema guardado para evitar parpadeo; aquí solo
-  // sincronizamos el ícono/etiqueta del botón con lo que quedó aplicado.
-  applyTheme(htmlRoot.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
-  if (btnThemeToggle) {
-    btnThemeToggle.addEventListener('click', () => {
-      const current = htmlRoot.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-      applyTheme(current === 'light' ? 'dark' : 'light');
-    });
-  }
-
   // ---------- Barra de formato, zoom y paneles ----------
   const formatbar = document.getElementById('editorFormatbar');
   const formatImageButton = document.getElementById('formatImageButton');
@@ -1552,7 +2343,7 @@
               break;
 
             case 'available':
-              updateBtnLabel.textContent = 'Descargando v' + (data && data.version ? data.version : '') + '...';
+              updateBtnLabel.textContent = 'Descargando R' + (data && data.version ? data.version : '') + '...';
               break;
 
             case 'downloading':
@@ -1591,6 +2382,7 @@
   const btnChooseFolder = document.getElementById('btnChooseFolder');
   const btnSaveNow = document.getElementById('btnSaveNow');
   const btnPrint = document.getElementById('btnPrint');
+  const btnPdf = document.getElementById('btnPdf');
   const btnSaveTemplate = document.getElementById('btnSaveTemplate');
   const baseNameInput = document.getElementById('baseName');
   const imageFileInput = document.getElementById('imageFileInput');
@@ -1618,23 +2410,21 @@
   const templateNameInput = document.getElementById('templateNameInput');
   const templateSaveCancel = document.getElementById('templateSaveCancel');
   const templateSaveConfirm = document.getElementById('templateSaveConfirm');
-  const templatesListEl = document.getElementById('templatesList');
 
   const fieldsListEl = document.getElementById('fieldsList');
   const imagesListEl = document.getElementById('imagesList');
-  const folderDot = document.getElementById('folderDot');
-  const folderStatus = document.getElementById('folderStatus');
   const saveStatus = document.getElementById('saveStatus');
 
-  const folderFilesListEl = document.getElementById('folderFilesList');
+  const folderNameEl = document.getElementById('folderName');
+  const folderChip = document.getElementById('folderChip');
+  const btnOpenFolder = document.getElementById('btnOpenFolder');
+  const libListEl = document.getElementById('folderFilesList');
+  const libHintEl = document.getElementById('libHint');
   const btnRefreshFolderFiles = document.getElementById('btnRefreshFolderFiles');
-  const folderFilesSearchInput = document.getElementById('folderFilesSearch');
+  const libSearchInput = document.getElementById('folderFilesSearch');
 
   let savedRange = null;
   let editingSpanId = null;
-  let dirHandle = null;
-  let useDirectAccess = false;
-  let versionCount = 0;
   let hasContent = false;
   let imgCounter = 0;
   let restoreCounter = 0;
@@ -2058,17 +2848,8 @@
   loadConfirm.addEventListener('click', () => {
     const clean = sanitizeLoadedHtml(loadRich.innerHTML).trim();
     if (!clean) { loadOverlay.classList.remove('show'); return; }
-    editor.innerHTML = clean;
-    editor.setAttribute('contenteditable', 'true');
-    hasContent = true;
-    btnInsertField.disabled = false;
-    btnInsertImage.disabled = false;
-    btnPrint.disabled = false;
-    btnSaveTemplate.disabled = false;
-    bindImageWrapperInteractions(editor);
+    loadIntoEditor(clean);
     loadOverlay.classList.remove('show');
-    refreshFieldsList();
-    refreshImagesList();
   });
 
   // ---------- Guardar posición del cursor ----------
@@ -2091,6 +2872,7 @@
     fieldModalTitle.textContent = 'Insertar campo';
     fieldLabel.value = '';
     fieldValue.value = '';
+    document.getElementById('fieldApplyAllWrap').hidden = true;
     fieldDelete.style.display = 'none';
     fieldSave.textContent = 'Insertar';
     fieldOverlay.classList.add('show');
@@ -2113,15 +2895,30 @@
     }
     const span = e.target.closest('.campo');
     if (!span) return;
+    openFieldEditor(span);
+  });
+
+  // Los campos con el mismo nombre (p. ej. "Nombre del inquilino" en
+  // varias cláusulas) se pueden editar todos a la vez.
+  let editingLabelOriginal = null;
+  function camposConNombre(label){
+    return [...editor.querySelectorAll('.campo')].filter(s => (s.getAttribute('data-label') || 'Campo') === label);
+  }
+  function openFieldEditor(span){
     editingSpanId = span.id;
+    editingLabelOriginal = span.getAttribute('data-label') || 'Campo';
     fieldModalTitle.textContent = 'Editar campo';
     fieldLabel.value = span.getAttribute('data-label') || '';
     fieldValue.value = span.getAttribute('data-value') || '';
+    const iguales = camposConNombre(editingLabelOriginal).length;
+    document.getElementById('fieldApplyAllWrap').hidden = iguales < 2;
+    document.getElementById('fieldApplyAll').checked = true;
+    document.getElementById('fieldApplyAllText').textContent = 'Aplicar a los ' + iguales + ' campos "' + editingLabelOriginal + '" del documento';
     fieldDelete.style.display = 'inline-block';
     fieldSave.textContent = 'Guardar cambios';
     fieldOverlay.classList.add('show');
-    fieldLabel.focus();
-  });
+    fieldValue.focus();
+  }
 
   fieldCancel.addEventListener('click', () => fieldOverlay.classList.remove('show'));
 
@@ -2131,11 +2928,12 @@
 
     if (editingSpanId) {
       const span = document.getElementById(editingSpanId);
-      if (span) {
-        span.setAttribute('data-label', label);
-        span.setAttribute('data-value', value);
-        renderFieldContent(span, label, value);
-      }
+      const todos = !document.getElementById('fieldApplyAllWrap').hidden && document.getElementById('fieldApplyAll').checked;
+      (todos ? camposConNombre(editingLabelOriginal) : (span ? [span] : [])).forEach(s => {
+        s.setAttribute('data-label', label);
+        s.setAttribute('data-value', value);
+        renderFieldContent(s, label, value);
+      });
     } else {
       if (!savedRange) { fieldOverlay.classList.remove('show'); return; }
       const span = document.createElement('span');
@@ -2261,85 +3059,90 @@
   });
 
   // ---------- Panel lateral: campos ----------
+  // Una fila por nombre de campo (un mismo campo puede aparecer varias
+  // veces en el documento); los que faltan por completar se marcan.
   function refreshFieldsList(){
-    const spans = editor.querySelectorAll('.campo');
-    fieldsListEl.dataset.summary = '☷  Secciones: ' + spans.length;
-    if (spans.length === 0) {
-      fieldsListEl.innerHTML = '<div class="no-fields">Todavía no has insertado ningún campo.</div>';
+    const spans = [...editor.querySelectorAll('.campo')];
+    const grupos = new Map();
+    spans.forEach(s => {
+      const label = s.getAttribute('data-label') || 'Campo';
+      if (!grupos.has(label)) grupos.set(label, []);
+      grupos.get(label).push(s);
+    });
+    const vacios = [...grupos.values()].filter(g => !(g[0].getAttribute('data-value') || '').trim()).length;
+    document.getElementById('libCountCampos').textContent = grupos.size ? String(grupos.size) : '';
+    document.getElementById('fieldsSummary').textContent = !grupos.size ? 'Sin campos'
+      : grupos.size + (grupos.size === 1 ? ' campo' : ' campos') + (vacios ? ' · ' + vacios + ' sin completar' : ' · todos completos');
+    if (!grupos.size) {
+      fieldsListEl.innerHTML = '<div class="lib-empty"><strong>Sin campos</strong>Coloca el cursor en el texto y pulsa "+ Campo". Con nombres como "Nombre del inquilino" se rellenan solos desde el contrato.</div>';
       return;
     }
-    fieldsListEl.innerHTML = '';
-    spans.forEach(span => {
-      const label = span.getAttribute('data-label') || 'Campo';
-      const value = span.getAttribute('data-value') || '';
-      const item = document.createElement('div');
-      item.className = 'field-item';
-      item.innerHTML = `
-        <div class="f-label">${escapeHtml(label)}</div>
-        <div class="f-value">${value ? escapeHtml(value) : '<em>(sin completar)</em>'}</div>
-        <div class="f-actions">
-          <button class="btn-panel" data-act="goto">Ver</button>
-          <button class="btn-panel" data-act="edit">Editar</button>
-          <button class="btn-wine" data-act="del">Eliminar</button>
-        </div>
-      `;
-      item.querySelector('[data-act="goto"]').addEventListener('click', () => {
-        span.scrollIntoView({behavior:'smooth', block:'center'});
-        span.style.outline = '2px solid var(--wine)';
-        setTimeout(() => span.style.outline = '', 900);
-      });
-      item.querySelector('[data-act="edit"]').addEventListener('click', () => {
-        editingSpanId = span.id;
-        fieldModalTitle.textContent = 'Editar campo';
-        fieldLabel.value = label;
-        fieldValue.value = value;
-        fieldDelete.style.display = 'inline-block';
-        fieldSave.textContent = 'Guardar cambios';
-        fieldOverlay.classList.add('show');
-      });
-      item.querySelector('[data-act="del"]').addEventListener('click', () => {
-        span.remove();
-        refreshFieldsList();
-        markDirty();
-      });
-      fieldsListEl.appendChild(item);
-    });
+    fieldsListEl.innerHTML = [...grupos.entries()].map(([label, lista]) => {
+      const value = lista[0].getAttribute('data-value') || '';
+      return '<div class="field-row' + (value.trim() ? '' : ' is-empty') + '" data-campo="' + escapeHtml(label) + '">' +
+        '<button type="button" class="fr-main" data-fr="editar" title="Editar">' +
+          '<span class="fr-label">' + escapeHtml(label) + (lista.length > 1 ? ' <span class="fr-count">×' + lista.length + '</span>' : '') + '</span>' +
+          '<span class="fr-value">' + (value.trim() ? escapeHtml(value) : 'Sin completar') + '</span></button>' +
+        '<button type="button" class="icon-x" data-fr="ir" title="Ir al campo en el documento" aria-label="Ir al campo">⌖</button>' +
+        '<button type="button" class="icon-x" data-fr="quitar" title="Quitar del documento" aria-label="Quitar el campo">✕</button></div>';
+    }).join('');
   }
+
+  // Ir al campo recorre sus apariciones una a una.
+  const vueltaCampo = new Map();
+  fieldsListEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-fr]');
+    if (!btn) return;
+    const label = btn.closest('.field-row').dataset.campo;
+    const lista = camposConNombre(label);
+    if (!lista.length) return;
+    if (btn.dataset.fr === 'editar') { openFieldEditor(lista[0]); return; }
+    if (btn.dataset.fr === 'ir') {
+      const i = (vueltaCampo.get(label) || 0) % lista.length;
+      vueltaCampo.set(label, i + 1);
+      const span = lista[i];
+      span.scrollIntoView({ behavior:'smooth', block:'center' });
+      span.classList.add('campo-resaltado');
+      setTimeout(() => span.classList.remove('campo-resaltado'), 1200);
+      return;
+    }
+    if (btn.dataset.fr === 'quitar') {
+      if (lista.length > 1 && !(await showConfirmDialog('¿Quitar los ' + lista.length + ' campos "' + label + '" del documento?', 'Quitar campos'))) return;
+      lista.forEach(s => s.remove());
+      refreshFieldsList();
+      markDirty();
+    }
+  });
 
   // ---------- Panel lateral: imágenes ----------
   function refreshImagesList(){
-    const wraps = editor.querySelectorAll('.img-wrap');
-    imagesListEl.dataset.summary = '▧  Imágenes: ' + wraps.length;
-    if (wraps.length === 0) {
-      imagesListEl.innerHTML = '<div class="no-fields">Todavía no hay imágenes en el documento.</div>';
+    const wraps = [...editor.querySelectorAll('.img-wrap')];
+    document.getElementById('imagesCount').textContent = wraps.length ? String(wraps.length) : '';
+    if (!wraps.length) {
+      imagesListEl.innerHTML = '<div class="no-fields">Sin imágenes. Pégalas, arrástralas a la página o usa "+ Imagen".</div>';
       return;
     }
-    imagesListEl.innerHTML = '';
-    wraps.forEach((wrap, idx) => {
+    imagesListEl.innerHTML = wraps.map((wrap, idx) => {
       const img = wrap.querySelector('img');
-      const item = document.createElement('div');
-      item.className = 'img-item';
-      item.innerHTML = `
-        <img src="${img ? img.src : ''}" alt="miniatura">
-        <div class="img-meta">Imagen ${idx + 1}</div>
-        <div class="img-actions">
-          <button class="btn-panel" data-act="goto">Ver</button>
-          <button class="btn-wine" data-act="del">Eliminar</button>
-        </div>
-      `;
-      item.querySelector('[data-act="goto"]').addEventListener('click', () => {
-        wrap.scrollIntoView({behavior:'smooth', block:'center'});
-        wrap.style.outline = '2px solid var(--wine)';
-        setTimeout(() => wrap.style.outline = '', 900);
-      });
-      item.querySelector('[data-act="del"]').addEventListener('click', () => {
-        wrap.remove();
-        refreshImagesList();
-        markDirty();
-      });
-      imagesListEl.appendChild(item);
-    });
+      return '<div class="img-thumb" data-img="' + escapeHtml(wrap.id) + '">' +
+        '<button type="button" class="img-thumb-ver" data-ir title="Ir a la imagen ' + (idx + 1) + '"><img src="' + (img ? img.src : '') + '" alt="Imagen ' + (idx + 1) + '"></button>' +
+        '<button type="button" class="img-thumb-x" data-quitar title="Quitar la imagen" aria-label="Quitar la imagen">✕</button></div>';
+    }).join('');
   }
+
+  imagesListEl.addEventListener('click', (e) => {
+    const cont = e.target.closest('[data-img]');
+    const wrap = cont && document.getElementById(cont.dataset.img);
+    if (!wrap) return;
+    if (e.target.closest('[data-quitar]')) {
+      wrap.remove();
+      refreshImagesList();
+      markDirty();
+    } else if (e.target.closest('[data-ir]')) {
+      wrap.scrollIntoView({ behavior:'smooth', block:'center' });
+      selectImage(wrap);
+    }
+  });
 
   document.addEventListener('mousedown', (e) => {
     if (!e.target.closest('.img-wrap')) deselectAllImages();
@@ -2351,97 +3154,265 @@
     saveStatus.textContent = 'Cambios sin guardar.';
   }
 
-  // ---------- Modelos guardados (plantillas reutilizables) ----------
-  // Se guardan manualmente en este navegador (localStorage). Seleccionar
-  // un modelo carga una COPIA en el editor: llenar los campos y exportar
-  // a Word no modifica el modelo guardado, que queda intacto para volver
-  // a usarse.
-  const TEMPLATES_KEY = 'redactorContratos.plantillas.v1';
-
-  function getTemplates(){
-    try {
-      const raw = localStorage.getItem(TEMPLATES_KEY);
-      const list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
-    } catch (err) {
-      return [];
-    }
-  }
-
-  async function persistTemplates(list){
-    try {
-      localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list));
-      return true;
-    } catch (err) {
-      await showNotice('No se pudo guardar el modelo: el almacenamiento del navegador está lleno o no disponible. Prueba eliminando algún modelo con imágenes muy pesadas.');
-      return false;
-    }
-  }
-
-  function formatTemplateDate(iso){
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0,5);
-    } catch (err) {
-      return '';
-    }
-  }
-
-  function refreshTemplatesList(){
-    const templates = getTemplates();
-    if (templates.length === 0) {
-      templatesListEl.innerHTML = '<div class="no-fields">Todavía no has guardado ningún modelo.</div>';
-      return;
-    }
-    templatesListEl.innerHTML = '';
-    templates.slice().reverse().forEach(tpl => {
-      const item = document.createElement('div');
-      item.className = 'field-item';
-      item.innerHTML = `
-        <div class="f-label">${escapeHtml(tpl.name)}</div>
-        <div class="f-value">Guardado: ${escapeHtml(formatTemplateDate(tpl.savedAt))}</div>
-        <div class="f-actions">
-          <button class="btn-panel" data-act="use">Usar</button>
-          <button class="btn-wine" data-act="del">Eliminar</button>
-        </div>
-      `;
-      item.querySelector('[data-act="use"]').addEventListener('click', () => useTemplate(tpl.id));
-      item.querySelector('[data-act="del"]').addEventListener('click', () => deleteTemplate(tpl.id));
-      templatesListEl.appendChild(item);
-    });
-  }
-
-  async function useTemplate(id){
-    const templates = getTemplates();
-    const tpl = templates.find(t => t.id === id);
-    if (!tpl) return;
-    if (hasContent) {
-      const ok = await showConfirmDialog('Esto reemplazará el documento que tienes abierto ahora por el modelo "' + tpl.name + '". ¿Continuar?');
-      if (!ok) return;
-    }
+  // Reemplaza el contenido del editor por un HTML ya editable (modelo,
+  // documento reabierto o documento guardado en un contrato) y deja
+  // listos los botones y paneles laterales.
+  function loadIntoEditor(html){
     deselectAllImages();
-    editor.innerHTML = tpl.html;
+    editor.innerHTML = html;
     editor.setAttribute('contenteditable', 'true');
     hasContent = true;
     btnInsertField.disabled = false;
     btnInsertImage.disabled = false;
     btnPrint.disabled = false;
+    btnPdf.disabled = !(window.rcPrint && window.rcPrint.pdf);
     btnSaveTemplate.disabled = false;
     bindImageWrapperInteractions(editor);
     refreshFieldsList();
     refreshImagesList();
     markDirty();
-    saveStatus.textContent = 'Modelo "' + tpl.name + '" cargado. Los cambios que hagas no afectan al modelo guardado.';
+    syncEstadoEditor();
   }
 
-  async function deleteTemplate(id){
-    const templates = getTemplates();
-    const tpl = templates.find(t => t.id === id);
-    if (!tpl) return;
-    const ok = await showConfirmDialog('¿Eliminar el modelo "' + tpl.name + '"? Esta acción no se puede deshacer.');
+  // ---------- Carpeta de trabajo: documentos y modelos ----------
+  // La carpeta se elige con el diálogo del sistema y main.js la recuerda
+  // entre sesiones (window.rcFiles), sin permisos que reactivar. Dentro:
+  //   *.doc            documentos guardados ("Guardar .doc")
+  //   Modelos/*.html   modelos reutilizables ("Guardar como modelo")
+  // Usar un modelo carga una COPIA en el editor: el archivo del modelo no
+  // cambia hasta que se vuelva a guardar con el mismo nombre.
+  const files = window.rcFiles || null;
+  // Modelos de versiones anteriores, guardados en el almacenamiento de la
+  // app. Se mueven a la carpeta la primera vez que hay una disponible.
+  const LEGACY_TEMPLATES_KEY = 'redactorContratos.plantillas.v1';
+
+  let workFolder = { path: null, name: null, exists: false };
+  let folderDocs = [];
+  let folderModelos = [];
+  let libraryTab = 'documentos';
+
+  function folderReady(){ return !!(files && workFolder.exists); }
+
+  // Nombre de archivo válido en Windows a partir de lo que escriba el usuario.
+  function safeFileName(name){
+    return String(name || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '').slice(0, 80);
+  }
+  function templateNameOf(file){ return file.replace(/\.html$/i, ''); }
+
+  function formatFileDate(ms){
+    if (!ms) return '';
+    const d = new Date(ms);
+    return d.toLocaleDateString() + ', ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  }
+
+  async function refreshWorkFolder(){
+    if (!files) {
+      renderFolderChip();
+      renderLibrary();
+      return;
+    }
+    try {
+      workFolder = await files.getFolder();
+      if (workFolder.exists) {
+        await migrateLegacyTemplates();
+        const result = await files.list();
+        folderDocs = result.ok ? result.documentos.sort((a, b) => b.mtime - a.mtime) : [];
+        folderModelos = result.ok
+          ? result.modelos.map(m => ({ id: m.name, name: templateNameOf(m.name), mtime: m.mtime })).sort((a, b) => a.name.localeCompare(b.name))
+          : [];
+      } else {
+        folderDocs = [];
+        folderModelos = [];
+      }
+    } catch (err) {
+      folderDocs = [];
+      folderModelos = [];
+    }
+    renderFolderChip();
+    renderLibrary();
+  }
+
+  function renderFolderChip(){
+    const has = !!workFolder.path;
+    folderNameEl.textContent = !files ? 'No disponible' : (has ? workFolder.name + (workFolder.exists ? '' : ' (no encontrada)') : 'Sin elegir');
+    folderChip.title = has ? workFolder.path : 'Elige dónde se guardan tus documentos y modelos';
+    folderChip.classList.toggle('is-missing', has && !workFolder.exists);
+    folderChip.classList.toggle('is-empty', !has);
+    btnOpenFolder.disabled = !folderReady();
+    btnChooseFolder.textContent = has ? 'Cambiar' : 'Elegir carpeta';
+    btnChooseFolder.disabled = !files;
+  }
+
+  function setLibraryTab(tab){
+    document.querySelectorAll('[data-lib-tab]').forEach(b => {
+      const active = b.dataset.libTab === tab;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    // "Campos" es otro panel; "Documentos" y "Modelos" comparten la biblioteca.
+    document.querySelector('[data-rd-panel="biblioteca"]').hidden = tab === 'campos';
+    document.querySelector('[data-rd-panel="campos"]').hidden = tab !== 'campos';
+    if (tab === 'campos') return;
+    libraryTab = tab;
+    libSearchInput.placeholder = tab === 'modelos' ? 'Buscar modelo...' : 'Buscar documento...';
+    renderLibrary();
+  }
+
+  document.querySelectorAll('[data-lib-tab]').forEach(b => b.addEventListener('click', () => setLibraryTab(b.dataset.libTab)));
+  libSearchInput.addEventListener('input', renderLibrary);
+
+  function libItem(kind, icon, name, sub, actions){
+    return '<div class="lib-item">' +
+      '<span class="lib-icon lib-icon-' + kind + '" aria-hidden="true">' + icon + '</span>' +
+      '<div class="lib-main"><span class="lib-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
+        '<span class="lib-sub">' + escapeHtml(sub) + '</span></div>' +
+      '<div class="lib-actions">' + actions + '</div></div>';
+  }
+
+  function renderLibrary(){
+    document.getElementById('libCountDocs').textContent = folderReady() ? String(folderDocs.length) : '';
+    document.getElementById('libCountModelos').textContent = folderReady() ? String(folderModelos.length) : '';
+    libSearchInput.disabled = !folderReady();
+
+    if (!files) {
+      libListEl.innerHTML = '<div class="lib-empty">La carpeta de trabajo solo está disponible en la aplicación de escritorio.</div>';
+      libHintEl.textContent = '';
+      return;
+    }
+    if (!folderReady()) {
+      libListEl.innerHTML = '<div class="lib-empty"><strong>' + (workFolder.path ? 'No se encuentra la carpeta' : 'Elige una carpeta de trabajo') + '</strong>' +
+        (workFolder.path ? 'Puede que se haya movido o que la unidad no esté conectada: "' + escapeHtml(workFolder.path) + '".' : 'Ahí se guardarán tus contratos (.doc) y, en la subcarpeta "Modelos", tus modelos.') +
+        '<button type="button" class="btn-brass" data-lib="elegir">Elegir carpeta</button></div>';
+      libHintEl.textContent = '';
+      return;
+    }
+
+    const q = libSearchInput.value.trim().toLowerCase();
+    if (libraryTab === 'modelos') {
+      const list = folderModelos.filter(m => !q || m.name.toLowerCase().includes(q));
+      libListEl.innerHTML = list.length
+        ? list.map(m => libItem('modelo', '▣', m.name, 'Modificado ' + formatFileDate(m.mtime),
+            '<button type="button" class="btn-panel" data-lib="usar" data-name="' + escapeHtml(m.id) + '">Usar</button>' +
+            '<button type="button" class="btn-panel lib-del" data-lib="borrar-modelo" data-name="' + escapeHtml(m.id) + '" title="Mover a la papelera" aria-label="Eliminar modelo">✕</button>')).join('')
+        : '<div class="lib-empty">' + (q ? 'Ningún modelo coincide con "' + escapeHtml(q) + '".' : '<strong>Todavía no hay modelos</strong>Escribe o carga un contrato, inserta campos como "Nombre del inquilino" y pulsa "Guardar como modelo".') + '</div>';
+      libHintEl.textContent = 'Carpeta: ' + workFolder.name + '\\Modelos';
+    } else {
+      const list = folderDocs.filter(d => !q || d.name.toLowerCase().includes(q));
+      libListEl.innerHTML = list.length
+        ? list.map(d => libItem('doc', 'DOC', d.name.replace(/\.docx?$/i, ''), formatFileDate(d.mtime),
+            '<button type="button" class="btn-panel" data-lib="abrir" data-name="' + escapeHtml(d.name) + '">Abrir</button>' +
+            '<button type="button" class="btn-panel" data-lib="imprimir" data-name="' + escapeHtml(d.name) + '" title="Abrir e imprimir">⎙</button>')).join('')
+        : '<div class="lib-empty">' + (q ? 'Ningún documento coincide con "' + escapeHtml(q) + '".' : '<strong>Todavía no hay documentos</strong>Cada vez que pulses "Guardar .doc" se guardará aquí una versión.') + '</div>';
+      libHintEl.textContent = 'Carpeta: ' + workFolder.name;
+    }
+  }
+
+  libListEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-lib]');
+    if (!btn) return;
+    const name = btn.dataset.name;
+    const act = btn.dataset.lib;
+    if (act === 'elegir') await chooseWorkFolder();
+    else if (act === 'abrir') await openFolderFile(name, false);
+    else if (act === 'imprimir') await openFolderFile(name, true);
+    else if (act === 'usar') await useTemplate(name);
+    else if (act === 'borrar-modelo') await deleteTemplate(name);
+  });
+
+  async function chooseWorkFolder(){
+    if (!files) return false;
+    const result = await files.chooseFolder();
+    await refreshWorkFolder();
+    return !result.canceled && folderReady();
+  }
+
+  // Si todavía no hay carpeta, ofrece elegirla antes de guardar algo.
+  async function ensureWorkFolder(motivo){
+    if (folderReady()) return true;
+    const ok = await showConfirmDialog(motivo + (workFolder.path ? ' No se encuentra la carpeta "' + workFolder.path + '".' : ' Todavía no has elegido una.') + ' ¿Elegir la carpeta ahora?', 'Carpeta de trabajo');
+    return ok ? chooseWorkFolder() : false;
+  }
+
+  btnChooseFolder.addEventListener('click', chooseWorkFolder);
+  btnOpenFolder.addEventListener('click', async () => {
+    const result = await files.openFolder();
+    if (!result.ok) await showNotice('No se pudo abrir la carpeta' + (result.error && result.error !== 'sin-carpeta' ? ': ' + result.error : '.'));
+  });
+  btnRefreshFolderFiles.addEventListener('click', refreshWorkFolder);
+  // Los archivos pueden cambiar fuera de la app (copiados, borrados...).
+  window.addEventListener('focus', () => { if (files) refreshWorkFolder(); });
+
+  // ---------- Modelos ----------
+  function templateFileText(name, html){
+    return '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="generator" content="RentHouse - modelo de contrato">\n<title>' +
+      escapeHtml(name) + '</title>\n</head>\n<body>\n' + html + '\n</body>\n</html>\n';
+  }
+
+  async function readTemplateHtml(file){
+    const result = await files.read('modelo', file);
+    if (!result.ok) throw new Error(result.error);
+    return stripDangerousTags(extractBodyFromDocText(result.text)).trim();
+  }
+
+  async function writeTemplate(name, html){
+    const file = safeFileName(name) + '.html';
+    let result = await files.write('modelo', file, templateFileText(name, html), false);
+    if (!result.ok && result.error === 'existe') {
+      const ok = await showConfirmDialog('Ya existe un modelo llamado "' + templateNameOf(file) + '". ¿Reemplazarlo por el documento actual?', 'Reemplazar modelo');
+      if (!ok) return null;
+      result = await files.write('modelo', file, templateFileText(name, html), true);
+    }
+    if (!result.ok) throw new Error(result.error);
+    return file;
+  }
+
+  async function migrateLegacyTemplates(){
+    let legacy = [];
+    try { legacy = JSON.parse(localStorage.getItem(LEGACY_TEMPLATES_KEY) || '[]'); } catch (err) { legacy = []; }
+    if (!Array.isArray(legacy) || !legacy.length) return;
+    const pendientes = [];
+    let movidos = 0;
+    for (const tpl of legacy) {
+      const base = safeFileName(tpl.name) || 'Modelo';
+      let file = base + '.html';
+      let result = await files.write('modelo', file, templateFileText(tpl.name, tpl.html || ''), false);
+      for (let n = 2; !result.ok && result.error === 'existe' && n < 50; n++) {
+        file = base + ' (' + n + ').html';
+        result = await files.write('modelo', file, templateFileText(tpl.name, tpl.html || ''), false);
+      }
+      if (result.ok) movidos++;
+      else pendientes.push(tpl);
+    }
+    try {
+      if (pendientes.length) localStorage.setItem(LEGACY_TEMPLATES_KEY, JSON.stringify(pendientes));
+      else localStorage.removeItem(LEGACY_TEMPLATES_KEY);
+    } catch (err) { /* se reintentará la próxima vez */ }
+    if (movidos) {
+      showNotice('Se movieron ' + movidos + (movidos === 1 ? ' modelo guardado' : ' modelos guardados') + ' a la carpeta "' + workFolder.name + '\\Modelos". A partir de ahora los modelos viven ahí.', 'Modelos en la carpeta');
+    }
+  }
+
+  async function useTemplate(file){
+    if (hasContent) {
+      const ok = await showConfirmDialog('Esto reemplazará el documento que tienes abierto ahora por el modelo "' + templateNameOf(file) + '". ¿Continuar?');
+      if (!ok) return;
+    }
+    try {
+      const html = await readTemplateHtml(file);
+      if (!html) { await showNotice('El modelo "' + templateNameOf(file) + '" está vacío.'); return; }
+      loadIntoEditor(html);
+      saveStatus.textContent = 'Modelo "' + templateNameOf(file) + '" cargado. Los cambios no afectan al modelo guardado.';
+    } catch (err) {
+      await showNotice('No se pudo abrir el modelo: ' + err.message);
+    }
+  }
+
+  async function deleteTemplate(file){
+    const ok = await showConfirmDialog('¿Eliminar el modelo "' + templateNameOf(file) + '"? Se moverá a la papelera de reciclaje.', 'Eliminar modelo');
     if (!ok) return;
-    await persistTemplates(templates.filter(t => t.id !== id));
-    refreshTemplatesList();
+    const result = await files.trash('modelo', file);
+    if (!result.ok) await showNotice('No se pudo eliminar el modelo: ' + result.error);
+    await refreshWorkFolder();
   }
 
   btnSaveTemplate.addEventListener('click', async () => {
@@ -2449,276 +3420,36 @@
       await showNotice('Primero carga o escribe el texto del contrato.');
       return;
     }
+    if (!(await ensureWorkFolder('Los modelos se guardan en la subcarpeta "Modelos" de tu carpeta de trabajo.'))) return;
     templateNameInput.value = '';
     templateSaveOverlay.classList.add('show');
     templateNameInput.focus();
   });
 
   templateSaveCancel.addEventListener('click', () => templateSaveOverlay.classList.remove('show'));
+  templateNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') templateSaveConfirm.click(); });
 
   templateSaveConfirm.addEventListener('click', async () => {
     const name = templateNameInput.value.trim();
-    if (!name) {
+    if (!safeFileName(name)) {
       await showNotice('Ponle un nombre al modelo para poder identificarlo luego.');
       templateNameInput.focus();
       return;
     }
-    const templates = getTemplates();
-    templates.push({
-      id: 'tpl-' + Date.now() + '-' + Math.floor(Math.random()*1000),
-      name: name,
-      html: editor.innerHTML,
-      savedAt: new Date().toISOString()
-    });
-    if (await persistTemplates(templates)) {
-      templateSaveOverlay.classList.remove('show');
-      refreshTemplatesList();
-      saveStatus.textContent = 'Modelo "' + name + '" guardado.';
+    templateSaveOverlay.classList.remove('show');
+    try {
+      deselectAllImages();
+      const file = await writeTemplate(name, editor.innerHTML);
+      if (!file) return;
+      saveStatus.textContent = 'Modelo "' + templateNameOf(file) + '" guardado en la carpeta Modelos.';
+      await refreshWorkFolder();
+      setLibraryTab('modelos');
+    } catch (err) {
+      await showNotice('No se pudo guardar el modelo: ' + err.message);
     }
   });
 
-  refreshTemplatesList();
-
-  // ---------- Selección de carpeta (y recordarla entre sesiones) ----------
-  // El identificador (FileSystemDirectoryHandle) de la carpeta elegida se
-  // guarda en IndexedDB, que sí admite almacenar este tipo de objeto (a
-  // diferencia de localStorage). Al reabrir el programa se recupera y solo
-  // hace falta reconfirmar el permiso -sin volver a buscar la carpeta- si
-  // el navegador/SO lo pide de nuevo por seguridad.
-  const FOLDER_DB_NAME = 'redactorContratosDB';
-  const FOLDER_DB_STORE = 'handles';
-  const FOLDER_HANDLE_KEY = 'carpetaGuardado';
-
-  function openFolderHandleDB(){
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(FOLDER_DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(FOLDER_DB_STORE)) {
-          req.result.createObjectStore(FOLDER_DB_STORE);
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  async function saveRememberedDirHandle(handle){
-    try {
-      const db = await openFolderHandleDB();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction(FOLDER_DB_STORE, 'readwrite');
-        tx.objectStore(FOLDER_DB_STORE).put(handle, FOLDER_HANDLE_KEY);
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (err) { /* no crítico: si falla, simplemente no se recordará la carpeta */ }
-  }
-
-  async function loadRememberedDirHandle(){
-    try {
-      const db = await openFolderHandleDB();
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(FOLDER_DB_STORE, 'readonly');
-        const req = tx.objectStore(FOLDER_DB_STORE).get(FOLDER_HANDLE_KEY);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-      });
-    } catch (err) {
-      return null;
-    }
-  }
-
-  btnChooseFolder.addEventListener('click', async () => {
-    if (!('showDirectoryPicker' in window)) {
-      useDirectAccess = false;
-      dirHandle = null;
-      folderDot.className = 'dot warn';
-      folderStatus.textContent = 'Este navegador/entorno no permite elegir carpeta directamente. Cada "Guardar" descargará el archivo .doc.';
-      refreshFolderFilesList();
-      return;
-    }
-    try {
-      if (dirHandle && !useDirectAccess) {
-        // Ya conocemos esta carpeta (recordada de una sesión anterior);
-        // solo falta reconfirmar el permiso, sin volver a buscarla.
-        const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') throw new Error('permiso denegado');
-      } else {
-        // Sin carpeta recordada, o el usuario quiere elegir una distinta.
-        const newHandle = await window.showDirectoryPicker();
-        const perm = await newHandle.requestPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') throw new Error('permiso denegado');
-        dirHandle = newHandle;
-        await saveRememberedDirHandle(dirHandle);
-      }
-      useDirectAccess = true;
-      folderDot.className = 'dot on';
-      folderStatus.textContent = 'Carpeta seleccionada: "' + dirHandle.name + '". Cada guardado creará ahí una nueva versión.';
-    } catch (err) {
-      useDirectAccess = false;
-      folderDot.className = 'dot warn';
-      if (dirHandle) {
-        folderStatus.textContent = 'No se pudo reactivar el acceso a "' + dirHandle.name + '". Vuelve a pulsar "Seleccionar carpeta" para intentarlo de nuevo.';
-      } else {
-        folderStatus.textContent = 'No se pudo obtener acceso directo a una carpeta en este entorno (restricción del navegador/ventana). Cada "Guardar" descargará el archivo .doc a tu carpeta de descargas.';
-      }
-    }
-    refreshFolderFilesList();
-  });
-
-  // Al abrir el programa, intenta recuperar la carpeta recordada de la
-  // última sesión sin pedirle nada al usuario. Si el permiso sigue vigente
-  // se activa directamente; si el navegador exige reconfirmarlo, se deja
-  // lista la referencia para que un solo clic en "Elegir carpeta de
-  // guardado" la reactive (sin necesidad de volver a buscarla).
-  async function tryRestoreRememberedFolder(){
-    if (!('showDirectoryPicker' in window) || !('indexedDB' in window)) return;
-    const handle = await loadRememberedDirHandle();
-    if (!handle) return;
-    dirHandle = handle;
-    try {
-      const perm = await handle.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        useDirectAccess = true;
-        folderDot.className = 'dot on';
-        folderStatus.textContent = 'Carpeta seleccionada: "' + handle.name + '". Cada guardado creará ahí una nueva versión.';
-        refreshFolderFilesList();
-        return;
-      }
-    } catch (err) { /* algunos entornos no soportan queryPermission; se ignora */ }
-    useDirectAccess = false;
-    folderDot.className = 'dot warn';
-    folderStatus.textContent = 'Carpeta recordada: "' + handle.name + '". Pulsa "Seleccionar carpeta" para reactivar el acceso (no hace falta volver a buscarla).';
-    refreshFolderFilesList();
-  }
-  tryRestoreRememberedFolder();
-
-  // ---------- Panel lateral izquierdo: archivos de la carpeta elegida ----------
-  // Lista los .doc guardados con "showDirectoryPicker" y permite reabrirlos
-  // para seguir editando sus campos o para imprimirlos directamente,
-  // reconstruyendo la estructura editable (campos resaltados e imágenes
-  // con sus modos de ajuste) a partir del HTML exportado.
-
-  let lastFolderEntries = [];
-
-  async function reactivateRememberedFolder(){
-    if (!('showDirectoryPicker' in window)) return false;
-    if (!dirHandle) dirHandle = await loadRememberedDirHandle();
-    if (!dirHandle || typeof dirHandle.requestPermission !== 'function') return false;
-    try {
-      const permission = await dirHandle.requestPermission({ mode:'readwrite' });
-      if (permission !== 'granted') return false;
-      useDirectAccess = true;
-      folderDot.className = 'dot on';
-      folderStatus.textContent = 'Carpeta seleccionada: "' + dirHandle.name + '". Cada guardado creará ahí una nueva versión.';
-      return true;
-    } catch (err) {
-      useDirectAccess = false;
-      return false;
-    }
-  }
-
-  async function refreshFolderFilesList(){
-    if (!folderFilesListEl) return;
-    if (!dirHandle) {
-      lastFolderEntries = [];
-      setFolderSearchEnabled(false);
-      folderFilesListEl.innerHTML = '<div class="no-fields">Elige una carpeta de guardado (arriba) para ver aquí las versiones guardadas.</div>';
-      return;
-    }
-    if (!useDirectAccess) {
-      lastFolderEntries = [];
-      setFolderSearchEnabled(false);
-      folderFilesListEl.innerHTML = '<div class="no-fields">Carpeta recordada, pero sin permiso activo todavía. Pulsa "Seleccionar carpeta" para reactivarlo (no hace falta volver a buscarla).</div>';
-      return;
-    }
-    folderFilesListEl.innerHTML = '<div class="no-fields">Cargando archivos...</div>';
-    let entries = [];
-    try {
-      for await (const [name, handle] of dirHandle.entries()) {
-        if (handle.kind === 'file' && /\.docx?$/i.test(name)) {
-          entries.push({ name, handle });
-        }
-      }
-    } catch (err) {
-      lastFolderEntries = [];
-      setFolderSearchEnabled(false);
-      folderFilesListEl.innerHTML = '<div class="no-fields">No se pudo leer el contenido de la carpeta.</div>';
-      return;
-    }
-    if (entries.length === 0) {
-      lastFolderEntries = [];
-      setFolderSearchEnabled(false);
-      folderFilesListEl.innerHTML = '<div class="no-fields">Todavía no hay versiones guardadas en esta carpeta.</div>';
-      return;
-    }
-    const withDates = await Promise.all(entries.map(async e => {
-      let mtime = 0;
-      try {
-        const f = await e.handle.getFile();
-        mtime = f.lastModified;
-      } catch (err) { /* se ignora, se ordena al final de la lista */ }
-      return { name: e.name, handle: e.handle, mtime };
-    }));
-    withDates.sort((a, b) => b.mtime - a.mtime);
-
-    lastFolderEntries = withDates;
-    setFolderSearchEnabled(true);
-    renderFolderFilesList(folderFilesSearchInput ? folderFilesSearchInput.value : '');
-  }
-
-  function setFolderSearchEnabled(enabled){
-    if (!folderFilesSearchInput) return;
-    folderFilesSearchInput.disabled = !enabled;
-    if (!enabled) folderFilesSearchInput.value = '';
-  }
-
-  // Filtra en memoria la última lista leída de la carpeta (sin volver a
-  // tocar el disco) según lo que se escriba en el buscador, y la dibuja.
-  function renderFolderFilesList(query){
-    const q = (query || '').trim().toLowerCase();
-    const filtered = q
-      ? lastFolderEntries.filter(entry => entry.name.toLowerCase().includes(q))
-      : lastFolderEntries;
-
-    if (filtered.length === 0) {
-      folderFilesListEl.innerHTML = q
-        ? '<div class="no-fields">Ningún archivo coincide con "' + escapeHtml(query.trim()) + '".</div>'
-        : '<div class="no-fields">Todavía no hay versiones guardadas en esta carpeta.</div>';
-      return;
-    }
-
-    folderFilesListEl.innerHTML = '';
-    filtered.forEach(entry => {
-      const dateLabel = entry.mtime ? new Date(entry.mtime).toLocaleString() : '';
-      const item = document.createElement('div');
-      item.className = 'field-item';
-      item.innerHTML = `
-        <div class="f-label">${escapeHtml(entry.name)}</div>
-        <div class="f-value">${escapeHtml(dateLabel)}</div>
-        <div class="f-actions">
-          <button class="btn-panel" data-act="edit">Editar</button>
-          <button class="btn-panel" data-act="print">Imprimir</button>
-        </div>
-      `;
-      item.querySelector('[data-act="edit"]').addEventListener('click', () => openFolderFile(entry.handle, entry.name, false));
-      item.querySelector('[data-act="print"]').addEventListener('click', () => openFolderFile(entry.handle, entry.name, true));
-      folderFilesListEl.appendChild(item);
-    });
-  }
-
-  if (folderFilesSearchInput) {
-    folderFilesSearchInput.addEventListener('input', () => {
-      renderFolderFilesList(folderFilesSearchInput.value);
-    });
-  }
-
-  btnRefreshFolderFiles.addEventListener('click', async () => {
-    if (!useDirectAccess) {
-      await reactivateRememberedFolder();
-    }
-    await refreshFolderFilesList();
-  });
+  refreshWorkFolder();
 
   // Quita etiquetas que nunca deben interpretarse como contenido del
   // documento (script, style, etc.) antes de reinsertar el HTML leído
@@ -2727,6 +3458,14 @@
     const temp = document.createElement('div');
     temp.innerHTML = html;
     temp.querySelectorAll('script, style, meta, link, title, head, noscript, object, embed, iframe, xml').forEach(el => el.remove());
+    // Los modelos y documentos son archivos que se pueden editar fuera de
+    // la app: se quitan también manejadores de eventos y enlaces javascript:.
+    temp.querySelectorAll('*').forEach(el => {
+      [...el.attributes].forEach(attr => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on') || ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(attr.value))) el.removeAttribute(attr.name);
+      });
+    });
     return temp.innerHTML;
   }
 
@@ -2798,10 +3537,14 @@
     const container = document.createElement('div');
     container.innerHTML = stripDangerousTags(bodyHtml);
 
-    container.querySelectorAll('.campo').forEach(span => {
+    // Al exportar se les quita la clase "campo", pero conservan data-label
+    // y data-value: por ahí se reconocen para volver a hacerlos editables.
+    container.querySelectorAll('.campo, span[data-label]').forEach(span => {
+      span.className = 'campo';
       span.id = 'campo-' + Date.now() + '-' + (restoreCounter++);
       span.setAttribute('contenteditable', 'false');
       span.removeAttribute('style');
+      renderFieldContent(span, span.getAttribute('data-label') || 'Campo', span.getAttribute('data-value') || '');
     });
 
     container.querySelectorAll('img').forEach(img => {
@@ -2819,33 +3562,23 @@
     return doc && doc.body ? doc.body.innerHTML : '';
   }
 
-  async function openFolderFile(fileHandle, name, thenPrint){
+  async function openFolderFile(name, thenPrint){
     if (hasContent) {
       const ok = await showConfirmDialog('Esto reemplazará el documento que tienes abierto ahora por "' + name + '". ¿Continuar?');
       if (!ok) return;
     }
     try {
-      const file = await fileHandle.getFile();
-      const text = await file.text();
-      const bodyHtml = extractBodyFromDocText(text);
-      const restored = restoreEditableFromExportedHtml(bodyHtml).trim();
+      const result = await files.read('documento', name);
+      if (!result.ok) throw new Error(result.error);
+      const restored = restoreEditableFromExportedHtml(extractBodyFromDocText(result.text)).trim();
       if (!restored) {
-        await showNotice('No se pudo leer contenido de "' + name + '".');
+        await showNotice('No se pudo leer contenido de "' + name + '". Solo se pueden abrir los .doc guardados con este programa.');
         return;
       }
-      deselectAllImages();
-      editor.innerHTML = restored;
-      editor.setAttribute('contenteditable', 'true');
-      hasContent = true;
-      btnInsertField.disabled = false;
-      btnInsertImage.disabled = false;
-      btnPrint.disabled = false;
-      btnSaveTemplate.disabled = false;
-      bindImageWrapperInteractions(editor);
-      refreshFieldsList();
-      refreshImagesList();
-      markDirty();
-      saveStatus.textContent = 'Documento "' + name + '" abierto desde la carpeta. Puedes seguir editando sus campos.';
+      loadIntoEditor(restored);
+      // Propone el mismo nombre base, sin la fecha que se añadió al guardar.
+      baseNameInput.value = name.replace(/\.docx?$/i, '').replace(/_(v\d+_)?\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(-\d{2})?$/, '');
+      saveStatus.textContent = 'Documento "' + name + '" abierto. Al guardar se creará una nueva versión.';
       if (thenPrint) {
         await runPrintFlow();
       }
@@ -2855,38 +3588,34 @@
   }
 
   // ---------- Guardar como .doc ----------
+  // Cada guardado crea una versión nueva con fecha y hora en el nombre.
   btnSaveNow.addEventListener('click', async () => {
     if (!hasContent) {
       await showNotice('Primero carga el texto del contrato.');
       return;
     }
-    versionCount++;
-    const base = (baseNameInput.value.trim() || 'contrato').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const base = (baseNameInput.value.trim() || 'contrato').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_\-]+/g, '_');
     const now = new Date();
-    const stamp = now.toISOString().slice(0,16).replace('T','_').replace(':','-');
-    const filename = `${base}_v${versionCount}_${stamp}.doc`;
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + '_' + pad(now.getHours()) + '-' + pad(now.getMinutes()) + '-' + pad(now.getSeconds());
+    const filename = base + '_' + stamp + '.doc';
+    const docText = '﻿' + buildDocHtml(buildExportHtml(), base);
 
-    const cleanHtml = buildExportHtml();
-    const blob = buildDocBlob(cleanHtml, base);
-
-    if (useDirectAccess && dirHandle) {
-      try {
-        const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        saveStatus.textContent = `Guardado "${filename}" a las ${now.toLocaleTimeString()}.`;
-        refreshFolderFilesList();
+    if (files) {
+      if (!(await ensureWorkFolder('Los documentos se guardan en tu carpeta de trabajo.'))) return;
+      const result = await files.write('documento', filename, docText, false);
+      if (!result.ok) {
+        await showNotice('No se pudo guardar el documento: ' + result.error);
         return;
-      } catch (err) {
-        useDirectAccess = false;
-        folderDot.className = 'dot warn';
-        folderStatus.textContent = 'Se perdió el acceso a la carpeta. Se usará descarga manual desde ahora.';
-        refreshFolderFilesList();
       }
+      saveStatus.textContent = 'Guardado "' + filename + '" a las ' + now.toLocaleTimeString() + '.';
+      await refreshWorkFolder();
+      setLibraryTab('documentos');
+      return;
     }
 
-    const url = URL.createObjectURL(blob);
+    // Fuera de la aplicación de escritorio: se descarga el archivo.
+    const url = URL.createObjectURL(new Blob([docText], { type: 'application/msword' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
@@ -2894,7 +3623,7 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    saveStatus.textContent = `Descargado "${filename}" a las ${now.toLocaleTimeString()}.`;
+    saveStatus.textContent = 'Descargado "' + filename + '" a las ' + now.toLocaleTimeString() + '.';
   });
 
   function buildExportHtml(){
@@ -3010,8 +3739,27 @@
 
   btnPrint.addEventListener('click', runPrintFlow);
 
-  function buildDocBlob(bodyHtml, title){
-    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  // Guardar como PDF con el papel y la orientación elegidos.
+  btnPdf.addEventListener('click', async () => {
+    if (!hasContent || !(window.rcPrint && window.rcPrint.pdf)) return;
+    btnPdf.disabled = true;
+    try {
+      const r = await window.rcPrint.pdf({
+        bodyHtml: buildExportHtml(),
+        pageSize: paperSizeSelect ? paperSizeSelect.value : 'Letter',
+        landscape: landscapeCheckbox ? landscapeCheckbox.checked : false,
+        title: baseNameInput.value.trim() || 'contrato'
+      });
+      if (r && r.ok) saveStatus.textContent = 'PDF guardado: ' + r.name + '.';
+      else if (r && !r.canceled) await showNotice('No se pudo guardar el PDF' + (r.error ? ': ' + r.error : '.'));
+    } finally {
+      btnPdf.disabled = false;
+    }
+  });
+
+  // Documento .doc: HTML que Word abre directamente.
+  function buildDocHtml(bodyHtml, title){
+    return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset="utf-8"><title>${title}</title>
 <style>
   body{ font-family:"Georgia","Times New Roman",serif; font-size:12pt; color:#1a1a1a; line-height:1.5; position:relative; }
@@ -3020,11 +3768,167 @@
 </style>
 </head>
 <body>${bodyHtml}</body></html>`;
-    return new Blob(['\ufeff', html], { type: 'application/msword' });
   }
+
+  // ---------- API para el m\u00f3dulo de gesti\u00f3n (gestion.js) ----------
+  // gestion.js vive en su propio archivo y no ve las variables de este
+  // bloque; esto es lo \u00fanico que necesita del editor y de los avisos.
+  // ---------- Espacio de trabajo del redactor ----------
+  // La página se dibuja con el tamaño real del papel elegido y los mismos
+  // márgenes de la impresión (2 cm), con líneas donde caen los saltos de
+  // página. El zoom se ajusta solo al ancho disponible hasta que se usa
+  // "+" o "−"; "Ajustar" lo vuelve a activar.
+  const rdShell = document.getElementById('rdShell');
+  const rdDesk = document.getElementById('rdDesk');
+  const rdEmpty = document.getElementById('rdEmpty');
+  const rdStats = document.getElementById('rdStats');
+  const rdPanelToggle = document.getElementById('rdPanelToggle');
+  const formatBlockSelect = document.getElementById('formatBlockSelect');
+  const PAPELES = { Letter:['8.5in','11in'], A4:['210mm','297mm'], Legal:['8.5in','14in'], A3:['297mm','420mm'], A5:['148mm','210mm'], Tabloid:['11in','17in'] };
+  const aPx = (v) => parseFloat(v) * (v.endsWith('in') ? 96 : 96 / 25.4);
+  let zoomAuto = true;
+
+  function medidasPagina(){
+    const [w, h] = PAPELES[paperSizeSelect.value] || PAPELES.Letter;
+    return landscapeCheckbox.checked ? { w: h, h: w } : { w, h };
+  }
+
+  function aplicarPapel(){
+    const m = medidasPagina();
+    editor.style.setProperty('--page-w', m.w);
+    editor.style.setProperty('--page-h', m.h);
+    if (zoomAuto) ajustarZoom(); else actualizarStats();
+  }
+
+  function ajustarZoom(){
+    const disponible = rdDesk.clientWidth - 64;
+    if (disponible <= 0) return;
+    editorZoom = Math.max(50, Math.min(100, Math.floor(disponible / aPx(medidasPagina().w) * 100)));
+    updateEditorZoom();
+    actualizarStats();
+  }
+
+  function actualizarStats(){
+    if (!hasContent) { rdStats.textContent = ''; return; }
+    const palabras = ((editor.innerText || '').match(/\S+/g) || []).length;
+    const altoPagina = aPx(medidasPagina().h) * editorZoom / 100;
+    const paginas = Math.max(1, Math.ceil((editor.getBoundingClientRect().height - 2) / altoPagina));
+    rdStats.textContent = palabras.toLocaleString() + (palabras === 1 ? ' palabra' : ' palabras') + ' · ' + paginas + (paginas === 1 ? ' página' : ' páginas');
+  }
+
+  // Pantalla de inicio o página, según haya documento.
+  function syncEstadoEditor(){
+    rdEmpty.hidden = hasContent;
+    editor.hidden = !hasContent;
+    if (hasContent && zoomAuto) ajustarZoom(); else actualizarStats();
+  }
+
+  paperSizeSelect.addEventListener('change', aplicarPapel);
+  landscapeCheckbox.addEventListener('change', aplicarPapel);
+  [zoomOut, zoomIn].forEach(b => b.addEventListener('click', () => { zoomAuto = false; actualizarStats(); }));
+  document.getElementById('zoomFit').addEventListener('click', () => { zoomAuto = true; ajustarZoom(); });
+  new ResizeObserver(() => { if (zoomAuto && hasContent) ajustarZoom(); }).observe(rdDesk);
+  let statsTimer = null;
+  editor.addEventListener('input', () => { clearTimeout(statsTimer); statsTimer = setTimeout(actualizarStats, 300); });
+
+  rdEmpty.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rd-start]');
+    if (!b) return;
+    if (b.dataset.rdStart === 'blanco') {
+      loadIntoEditor('<p><br></p>');
+      saveStatus.textContent = 'Documento nuevo sin guardar.';
+      editor.focus();
+    } else if (b.dataset.rdStart === 'texto') {
+      btnLoadText.click();
+    } else {
+      abrirPanel(true);
+      setLibraryTab('modelos');
+    }
+  });
+
+  // Panel lateral plegable (se recuerda en este equipo).
+  const PANEL_KEY = 'renthouse.redactorPanel';
+  function abrirPanel(abierto){
+    rdShell.classList.toggle('panel-oculto', !abierto);
+    rdPanelToggle.setAttribute('aria-pressed', abierto ? 'true' : 'false');
+    try { localStorage.setItem(PANEL_KEY, abierto ? '1' : '0'); } catch (err) { /* no crítico */ }
+  }
+  rdPanelToggle.addEventListener('click', () => abrirPanel(rdShell.classList.contains('panel-oculto')));
+  document.querySelector('[data-rd-insertar-campo]').addEventListener('click', async () => {
+    if (btnInsertField.disabled) { await showNotice('Primero abre o empieza un documento.'); return; }
+    btnInsertField.click();
+  });
+
+  // Barra de formato: estilo del párrafo, salto de página y botones marcados
+  // según el texto donde está el cursor.
+  formatBlockSelect.addEventListener('change', () => runEditorCommand('formatBlock', '<' + formatBlockSelect.value + '>'));
+  const btnPageBreak = document.getElementById('btnPageBreak');
+  btnPageBreak.addEventListener('mousedown', (e) => e.preventDefault());
+  btnPageBreak.addEventListener('click', () => runEditorCommand('insertHTML', '<div class="salto-pagina" contenteditable="false" style="page-break-after:always"></div><p><br></p>'));
+  const COMANDOS_CON_ESTADO = ['bold', 'italic', 'underline', 'strikeThrough', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'];
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !editor.contains(sel.anchorNode)) return;
+    COMANDOS_CON_ESTADO.forEach(cmd => {
+      const b = formatbar.querySelector('[data-command="' + cmd + '"]');
+      if (b) b.classList.toggle('active', document.queryCommandState(cmd));
+    });
+    const bloque = String(document.queryCommandValue('formatBlock') || 'p').toLowerCase();
+    formatBlockSelect.value = ['h1', 'h2', 'h3'].includes(bloque) ? bloque : 'p';
+  });
+
+  // Atajos: Ctrl+S guarda el .doc, Ctrl+P imprime.
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || document.body.dataset.activeView !== 'redactor' || document.querySelector('.overlay.show')) return;
+    const tecla = e.key.toLowerCase();
+    if (tecla === 's') { e.preventDefault(); btnSaveNow.click(); }
+    if (tecla === 'p') { e.preventDefault(); if (hasContent) btnPrint.click(); }
+  });
+
+  try { abrirPanel(localStorage.getItem(PANEL_KEY) !== '0'); } catch (err) { abrirPanel(true); }
+  aplicarPapel();
+  syncEstadoEditor();
+
+  window.rcUI = { showNotice, showConfirmDialog };
+  window.rcEditor = {
+    hasContent: () => hasContent,
+    getHtml(){
+      deselectAllImages();
+      return editor.innerHTML;
+    },
+    loadHtml: loadIntoEditor,
+    // Modelos de la carpeta de trabajo: [{ id, name, mtime }] (vacío si no
+    // hay carpeta) y el HTML editable de uno de ellos.
+    async listTemplates(){
+      await refreshWorkFolder();
+      return folderReady() ? folderModelos.slice() : [];
+    },
+    readTemplate: readTemplateHtml,
+    hasWorkFolder: folderReady,
+    showLibrary: setLibraryTab,
+    // resolve(etiqueta) devuelve el valor para ese campo, o null si no
+    // lo reconoce. Devuelve cu\u00e1ntos campos se rellenaron.
+    fillFields(resolve){
+      let filled = 0;
+      editor.querySelectorAll('.campo').forEach(span => {
+        const label = span.getAttribute('data-label') || '';
+        const value = resolve(label);
+        if (value == null || value === '') return;
+        span.setAttribute('data-value', value);
+        renderFieldContent(span, label, value);
+        filled++;
+      });
+      if (filled) { refreshFieldsList(); markDirty(); }
+      return filled;
+    },
+    setBaseName(name){ baseNameInput.value = name; },
+    setStatus(text){ saveStatus.textContent = text; }
+  };
 
 })();
 </script>
+<script src="gestion.js"></script>
+<script src="seguridad.js"></script>
 
 </body>
 </html>
