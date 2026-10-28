@@ -1662,12 +1662,12 @@
   // Un único diálogo para aviso / confirmación / pedir texto.
   // kind: 'notice' | 'confirm' | 'prompt'. Enter acepta y Escape cancela.
   // Resuelve: notice → true; confirm → true/false; prompt → texto o null.
-  function openDialog(kind, message, title, defaultValue){
+  function openDialog(kind, message, title, defaultValue, okLabel){
     return new Promise((resolve) => {
       noticeTitle.textContent = title || (kind === 'notice' ? 'Aviso' : 'Confirmar');
       noticeMessage.textContent = message;
       noticeCancelBtn.style.display = kind === 'notice' ? 'none' : 'inline-block';
-      noticeOkBtn.textContent = kind === 'confirm' ? 'Continuar' : 'Aceptar';
+      noticeOkBtn.textContent = okLabel || (kind === 'confirm' ? 'Continuar' : 'Aceptar');
       noticeInput.style.display = kind === 'prompt' ? 'block' : 'none';
       noticeInput.value = defaultValue || '';
       noticeOverlay.classList.add('show');
@@ -1692,7 +1692,7 @@
     });
   }
   function showNotice(message, title){ return openDialog('notice', message, title); }
-  function showConfirmDialog(message, title){ return openDialog('confirm', message, title); }
+  function showConfirmDialog(message, title, okLabel){ return openDialog('confirm', message, title, '', okLabel); }
   function showPromptDialog(message, title, defaultValue){ return openDialog('prompt', message, title, defaultValue); }
 
   // ---------- Buscar actualizaciones ----------
@@ -2513,6 +2513,9 @@
     return [...groups.values()];
   }
 
+  let completePromptTimer = null;
+  let completePromptDone = false;
+
   function updateFieldsProgress(){
     const groups = getFieldGroups();
     const done = groups.filter(g => g.value.trim()).length;
@@ -2521,6 +2524,30 @@
     el.querySelector('.fp-text').textContent = done === groups.length ? 'Todos los campos completos' : (done + ' de ' + groups.length + ' completos');
     el.querySelector('.fp-bar span').style.width = (groups.length ? (done / groups.length * 100) : 0) + '%';
     el.classList.toggle('complete', done === groups.length);
+    // Un campo vacío (al vaciarlo a mano o al cargar otra vez el modelo)
+    // permite volver a preguntar cuando se complete de nuevo.
+    if (done < groups.length) completePromptDone = false;
+  }
+
+  // Al completar el último campo desde el panel se ofrece guardar. Se espera
+  // a que se deje de escribir para no cortar el valor a medias, y no se
+  // vuelve a preguntar hasta que algún campo quede vacío otra vez.
+  function scheduleCompletePrompt(){
+    clearTimeout(completePromptTimer);
+    const groups = getFieldGroups();
+    if (!groups.length || groups.some(g => !g.value.trim())) { completePromptDone = false; return; }
+    if (completePromptDone) return;
+    completePromptTimer = setTimeout(async () => {
+      if (completePromptDone || !isDirty || document.querySelector('.overlay.show')) return;
+      if (getFieldGroups().some(g => !g.value.trim())) return;
+      completePromptDone = true;
+      const ok = await showConfirmDialog('Todos los campos están completos. ¿Quieres guardar el documento ahora?', 'Campos completos', 'Guardar');
+      if (!ok) return;
+      const name = await showPromptDialog('¿Qué nombre quieres ponerle al documento?', 'Guardar documento', baseNameInput.value.trim() || 'contrato');
+      if (name === null) return;
+      if (name) baseNameInput.value = name;
+      btnSaveNow.click();
+    }, 1500);
   }
 
   function autoGrow(textarea){
@@ -2561,6 +2588,7 @@
         autoGrow(input);
         updateFieldsProgress();
         markDirty();
+        scheduleCompletePrompt();
       });
       let gotoIndex = 0;
       item.querySelector('[data-act="goto"]').addEventListener('click', () => {
