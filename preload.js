@@ -72,6 +72,30 @@ contextBridge.exposeInMainWorld('rcDidit', {
   verify: (cedula) => ipcRenderer.invoke('rc-didit-verify', cedula)
 });
 
+// Correo de envío (SMTP) para los recordatorios. La contraseña no vuelve
+// al renderer: solo se manda al guardarla.
+contextBridge.exposeInMainWorld('rcCorreo', {
+  status: () => ipcRenderer.invoke('rc-correo-status'),
+  set: (datos) => ipcRenderer.invoke('rc-correo-set', datos),
+  remove: () => ipcRenderer.invoke('rc-correo-remove'),
+  test: () => ipcRenderer.invoke('rc-correo-test'),
+  // mensajes: [{ id, to, subject, text }]; alProgreso({ hecho, total, resultado }) por cada envío.
+  enviarLote: async (mensajes, alProgreso) => {
+    const oyente = (_e, p) => { if (alProgreso) alProgreso(p); };
+    ipcRenderer.on('rc-correo-progreso', oyente);
+    try { return await ipcRenderer.invoke('rc-correo-enviar-lote', mensajes); }
+    finally { ipcRenderer.removeListener('rc-correo-progreso', oyente); }
+  }
+});
+
+// Comprueba el token firmado del servidor de licencias:
+// { ok, plan: 'completo'|'redactor' } o { ok:false, error }.
+contextBridge.exposeInMainWorld('rcLicencia', {
+  verificar: (datos) => ipcRenderer.invoke('rc-licencia-verificar', datos),
+  // Deja constancia en debug.log de por qué no se activó (para diagnosticar).
+  registrar: (texto) => ipcRenderer.send('rc-licencia-registro', String(texto).slice(0, 200))
+});
+
 contextBridge.exposeInMainWorld('rcApp', {
   version: ipcRenderer.sendSync('rc-app-version'),
   // Tamaño de la interfaz (Configuración → Apariencia), como el zoom del navegador.

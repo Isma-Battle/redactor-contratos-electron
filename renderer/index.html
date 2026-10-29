@@ -1123,7 +1123,11 @@
     gateStatus.className = 'license-status' + (kind ? ' ' + kind : '');
   }
 
-  function unlockApp(){
+  // Abre la aplicación con el plan de la licencia: gestion.js escucha
+  // 'rc-plan' ("completo" o "redactor") y oculta lo que no corresponde.
+  function unlockApp(plan){
+    window.rcPlan = plan;
+    document.dispatchEvent(new CustomEvent('rc-plan', { detail: plan }));
     gate.classList.add('gate-hidden');
   }
 
@@ -1131,9 +1135,16 @@
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ licenseKey: key, deviceId: deviceId })
+      body: JSON.stringify({ licenseKey: key, deviceId: deviceId, appVersion: window.rcApp ? window.rcApp.version : '' })
     });
     return res.json();
+  }
+
+  // El plan solo se acepta con la firma del servidor (se comprueba en el
+  // proceso principal). Fuera de la aplicación de escritorio no hay firma.
+  async function planDelToken(token, key, deviceId, maxEdadMs){
+    if (!window.rcLicencia) return { ok: true, plan: 'completo' };
+    return window.rcLicencia.verificar({ token, licenseKey: key, deviceId, maxEdadMs });
   }
 
   async function attemptValidation(key, silent){
@@ -1145,28 +1156,52 @@
     if (!silent) showStatus('Verificando licencia...', '');
     gateButton.disabled = true;
     try {
-      const result = await verifyLicense(key, deviceId);
+      let result;
+      try {
+        result = await verifyLicense(key, deviceId);
+      } catch (err) {
+        // Sin conexión: vale el último token firmado, si es de las últimas 12 horas.
+        const token = localStorage.getItem('rc_license_token');
+        const v = token && localStorage.getItem('rc_license_key') === key ? await planDelToken(token, key, deviceId, OFFLINE_GRACE_MS) : null;
+        if (v && v.ok) {
+          showStatus('Sin conexión: usando la última verificación válida (tienes ' + Math.max(0, Math.round((OFFLINE_GRACE_MS - v.edadMs) / 3600000)) + 'h de margen).', '');
+          unlockApp(v.plan);
+        } else {
+          showStatus('No se pudo conectar con el servidor de licencias. Revisa tu conexión a internet e inténtalo de nuevo.', 'err');
+        }
+        return;
+      }
       if (result.ok) {
+        const v = await planDelToken(result.token, key, deviceId, 0);
+        if (!v.ok) {
+          // El código entre paréntesis dice qué revisar en el servidor:
+          // sin-token = Worker sin actualizar; firma-invalida = LICENSE_SIGNING_KEY
+          // no es la pareja de licencia-publica.pem; sin-clave-publica = falta el .pem en la app.
+          const motivo = !result.token ? 'sin-token' : v.error;
+          if (window.rcLicencia && window.rcLicencia.registrar) window.rcLicencia.registrar('Licencia rechazada: ' + motivo);
+          showStatus('El servidor de licencias respondió sin una firma válida (' + motivo + '). Contacta a quien te entregó la licencia.', 'err');
+          return;
+        }
         localStorage.setItem('rc_license_key', key);
-        localStorage.setItem('rc_license_last_ok', Date.now().toString());
+        if (result.token) localStorage.setItem('rc_license_token', result.token);
+        localStorage.removeItem('rc_license_last_ok');
         showStatus('Licencia verificada.', 'ok');
-        unlockApp();
+        unlockApp(v.plan);
         return;
       }
       let msg = 'La clave de licencia no es válida.';
       if (result.reason === 'in_use_elsewhere') msg = 'Esta licencia ya está activada en otro equipo. Contacta a quien te la entregó.';
       if (result.reason === 'invalid_key') msg = 'Esa clave de licencia no existe.';
+      if (result.reason === 'update_required') msg = 'Esta licencia necesita la última versión del programa.';
+      if (window.rcLicencia && window.rcLicencia.registrar) window.rcLicencia.registrar('Licencia rechazada por el servidor: ' + (result.reason || 'sin motivo'));
+      if (result.reason === 'server_misconfigured') {
+        // Fallo del servidor, no de la clave: se conserva para reintentar.
+        showStatus('El servidor de licencias no está bien configurado (server_misconfigured). Contacta a quien te entregó la licencia.', 'err');
+        return;
+      }
       showStatus(msg, 'err');
       localStorage.removeItem('rc_license_key');
-    } catch (err) {
-      const lastOk = parseInt(localStorage.getItem('rc_license_last_ok') || '0', 10);
-      const storedKey = localStorage.getItem('rc_license_key');
-      if (storedKey === key && lastOk && (Date.now() - lastOk) < OFFLINE_GRACE_MS) {
-        showStatus('Sin conexión: usando la última verificación válida (tienes ' + Math.max(0, Math.round((OFFLINE_GRACE_MS - (Date.now()-lastOk))/3600000)) + 'h de margen).', '');
-        unlockApp();
-      } else {
-        showStatus('No se pudo conectar con el servidor de licencias. Revisa tu conexión a internet e inténtalo de nuevo.', 'err');
-      }
+      localStorage.removeItem('rc_license_token');
     } finally {
       gateButton.disabled = false;
     }
@@ -1243,7 +1278,7 @@
   </button>
   <button type="button" class="nav-item" data-view="liquidaciones" title="Liquidaciones">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h13l-3-3"/><path d="M20 17H7l3 3"/><circle cx="12" cy="12" r="2"/></svg>
-    <span>Liquidaciones</span><span class="nav-count" data-count="liquidacionesPendientes" title="Liquidaciones del mes anterior sin transferir"></span>
+    <span>Liquidaciones</span><span class="nav-count" data-count="liquidacionesPendientes" title="Liquidaciones del mes anterior sin registrar"></span>
   </button>
   <button type="button" class="nav-item" data-view="balance" title="Balance">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M6 17V11M10 17V6M14 17v-8M18 17V4"/></svg>
@@ -1299,13 +1334,16 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <span>Buscar inquilino, cédula, apartamento...</span><kbd>Ctrl K</kbd>
   </button>
+  <button type="button" class="topbar-ayuda" id="btnAyuda" title="Ayuda: recorrido por la aplicación" aria-label="Ayuda" aria-haspopup="true" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.9"/><path d="M12 17.2h.01"/></svg>
+  </button>
 </div>
 
 <!-- ---------- Vistas de gestión ---------- -->
 <section class="view" data-view="resumen" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Resumen</h2><p>Estado general de los inmuebles que administras.</p></div>
+      <div><h2>Resumen</h2></div>
       <div class="mgmt-actions">
         <button type="button" class="btn-brass" data-new="contrato">+ Nuevo contrato</button>
       </div>
@@ -1327,7 +1365,7 @@
 <section class="view" data-view="propietarios" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Propietarios</h2><p>Dueños de los inmuebles que administras, su comisión y su cuenta para las transferencias.</p></div>
+      <div><h2>Propietarios</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchPropietarios" placeholder="Buscar por nombre o documento...">
         <button type="button" class="btn-brass" data-new="propietario">+ Nuevo propietario</button>
@@ -1340,7 +1378,7 @@
 <section class="view" data-view="edificios" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Edificios</h2><p>Inmuebles que administras y sus propietarios.</p></div>
+      <div><h2>Edificios</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchEdificios" placeholder="Buscar edificio...">
         <button type="button" class="btn-brass" data-new="edificio">+ Nuevo edificio</button>
@@ -1359,7 +1397,7 @@
 <section class="view" data-view="unidades" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Apartamentos</h2><p>Unidades de cada edificio y quién las ocupa.</p></div>
+      <div><h2>Apartamentos</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchUnidades" placeholder="Buscar apartamento...">
         <select class="mgmt-select" id="filterUnidadesEdificio" title="Filtrar por edificio"></select>
@@ -1378,7 +1416,7 @@
 <section class="view" data-view="inquilinos" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Inquilinos</h2><p>Personas registradas y sus contratos.</p></div>
+      <div><h2>Inquilinos</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchInquilinos" placeholder="Buscar por nombre o documento...">
         <button type="button" class="btn-brass" data-new="inquilino">+ Nuevo inquilino</button>
@@ -1391,7 +1429,7 @@
 <section class="view" data-view="contratos" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Contratos</h2><p>Contratos de alquiler y su documento.</p></div>
+      <div><h2>Contratos</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchContratos" placeholder="Buscar inquilino o apartamento...">
         <select class="mgmt-select" id="filterContratosEstado" title="Filtrar por estado">
@@ -1410,7 +1448,7 @@
 <section class="view" data-view="mantenimiento" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Mantenimiento</h2><p>Solicitudes de reparación de apartamentos y áreas comunes.</p></div>
+      <div><h2>Mantenimiento</h2></div>
       <div class="mgmt-actions">
         <select class="mgmt-select" id="mntEstado" title="Filtrar por estado">
           <option value="abiertas">Sin resolver</option>
@@ -1431,7 +1469,7 @@
 <section class="view" data-view="casos" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Casos de cobro y desalojo</h2><p>Etapas, requisitos, fechas y actos de cada proceso.</p></div>
+      <div><h2>Casos de cobro y desalojo</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchCasos" placeholder="Buscar inquilino, tribunal o expediente...">
         <select class="mgmt-select" id="filterCasosEstado" title="Filtrar por estado">
@@ -1449,7 +1487,7 @@
 <section class="view" data-view="agenda" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Agenda</h2><p>Audiencias, plazos, citas y vencimientos de contratos.</p></div>
+      <div><h2>Agenda</h2></div>
       <div class="mgmt-actions">
         <button type="button" class="btn-brass" data-new="evento">+ Nuevo evento</button>
       </div>
@@ -1477,7 +1515,7 @@
 <section class="view" data-view="cobros" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Cobros</h2><p>Cuotas mensuales de los inquilinos y pagos recibidos.</p></div>
+      <div><h2>Cobros</h2></div>
       <div class="mgmt-actions">
         <div class="month-stepper">
           <button type="button" class="btn-panel" id="cobrosPrev" title="Mes anterior" aria-label="Mes anterior">‹</button>
@@ -1500,7 +1538,7 @@
 <section class="view" data-view="gastos" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Gastos</h2><p>Reparaciones, servicios de áreas comunes y demás gastos de los edificios.</p></div>
+      <div><h2>Gastos</h2></div>
       <div class="mgmt-actions">
         <input type="search" class="search-input mgmt-search" id="searchGastos" placeholder="Buscar concepto o proveedor...">
         <select class="mgmt-select" id="gastosEdificio" title="Filtrar por edificio"></select>
@@ -1517,28 +1555,36 @@
 <section class="view" data-view="liquidaciones" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Liquidaciones</h2><p>Lo que corresponde transferir a cada propietario: cobrado − gastos − comisión.</p></div>
+      <div><h2>Liquidaciones</h2></div>
       <div class="mgmt-actions">
-        <div class="month-stepper">
+        <div class="seg-tabs liq-modo" role="group" aria-label="Periodo">
+          <button type="button" class="seg-tab active" data-liq-modo="mes" aria-pressed="true">Por mes</button>
+          <button type="button" class="seg-tab" data-liq-modo="todo" aria-pressed="false">Todo</button>
+        </div>
+        <div class="month-stepper" id="liqMesControles">
           <button type="button" class="btn-panel" id="liqPrev" title="Mes anterior" aria-label="Mes anterior">‹</button>
           <input type="month" class="mgmt-select mgmt-month" id="liqMes" title="Mes">
           <button type="button" class="btn-panel" id="liqNext" title="Mes siguiente" aria-label="Mes siguiente">›</button>
         </div>
+        <select class="mgmt-select" id="liqEstado" title="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option value="pendientes">Pendientes</option>
+          <option value="registradas">Registradas</option>
+        </select>
         <select class="mgmt-select" id="liqPropietario" title="Filtrar por propietario"></select>
-        <button type="button" class="btn-panel" id="btnEnvioEstados" title="Estados de cuenta del mes para enviar a los propietarios">Enviar estados de cuenta</button>
+        <button type="button" class="btn-panel" id="btnEnvioEstados" title="Liquidaciones del mes para enviar a los propietarios">Enviar a propietarios</button>
       </div>
     </header>
     <div class="stat-grid" id="liqStats"></div>
     <h3 class="section-title" id="liqTitulo">Liquidaciones del mes</h3>
     <div class="mgmt-card table-card" id="liqTabla"></div>
-    <p class="mgmt-note">Se cuenta lo cobrado en el mes (por la fecha de cada pago) y los gastos con fecha del mes. Los gastos de áreas comunes se cargan al propietario del edificio; los de un apartamento, a su propietario.</p>
   </div>
 </section>
 
 <section class="view" data-view="balance" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Balance</h2><p>Ingresos cobrados frente a gastos, por mes.</p></div>
+      <div><h2>Balance</h2></div>
       <div class="mgmt-actions">
         <select class="mgmt-select" id="balanceAnio" title="Año"></select>
         <select class="mgmt-select" id="balanceMoneda" title="Moneda"></select>
@@ -1574,7 +1620,7 @@
 <section class="view" data-view="reportes" hidden>
   <div class="mgmt">
     <header class="mgmt-head">
-      <div><h2>Reportes</h2><p>Morosidad por antigüedad, depósitos en custodia y exportación a Excel.</p></div>
+      <div><h2>Reportes</h2></div>
       <div class="mgmt-actions">
         <select class="mgmt-select" id="repEdificio" title="Filtrar por edificio"></select>
         <select class="mgmt-select" id="repMoneda" title="Moneda"></select>
@@ -1583,7 +1629,6 @@
     <div class="stat-grid" id="repStats"></div>
     <h3 class="section-title">Morosidad por antigüedad</h3>
     <div class="mgmt-card table-card" id="repMorosidad"></div>
-    <p class="mgmt-note">Cada cuota vencida y sin pagar se clasifica por los días que lleva vencida. Incluye los recargos por mora.</p>
     <div class="mgmt-columns">
       <div class="mgmt-card">
         <h3>Depósitos en custodia</h3>
@@ -1591,7 +1636,6 @@
       </div>
       <div class="mgmt-card">
         <h3>Exportar a Excel</h3>
-        <p class="mgmt-note" style="margin:0 0 12px;">Un libro .xlsx con una hoja por tema: pagos, gastos, morosidad, contratos, inquilinos, propietarios, apartamentos y liquidaciones. Útil para el contador.</p>
         <div class="export-row">
           <label class="footer-field">Pagos, gastos y liquidaciones de
             <select class="mgmt-select" id="repAnio"></select>
@@ -1679,7 +1723,7 @@
         </div>
       </section>
 
-      <section class="mgmt-card cfg-card cfg-wide">
+      <section class="mgmt-card cfg-card cfg-wide solo-completo">
         <h3>Despacho</h3>
         <p class="cfg-desc">Aparece en recibos, estados de cuenta y recordatorios de pago.</p>
         <div class="cfg-fields">
@@ -1694,7 +1738,7 @@
 
       <section class="mgmt-card cfg-card cfg-wide">
         <h3>Valores predeterminados</h3>
-        <p class="cfg-desc">Se proponen al crear contratos, gastos y propietarios nuevos; en cada uno se pueden cambiar.</p>
+        <p class="cfg-desc">Se proponen al crear contratos, gastos y edificios nuevos; en cada uno se pueden cambiar.</p>
         <div class="cfg-fields">
           <label class="cfg-field"><span>Moneda</span>
             <select data-ajuste="moneda"><option>RD$</option><option>US$</option><option>€</option><option>$</option></select></label>
@@ -1710,8 +1754,8 @@
             <input type="number" min="0" step="0.01" data-ajuste="moraValor" data-tipo="numero" placeholder="Ej: 5"></label>
           <label class="cfg-field"><span>Días de gracia</span>
             <input type="number" min="0" max="60" step="1" data-ajuste="moraGracia" data-tipo="numero"></label>
-          <label class="cfg-field"><span>Comisión de propietarios nuevos</span>
-            <select data-ajuste="comisionTipo"><option value="porcentaje">Porcentaje de lo cobrado</option><option value="fijo">Monto fijo mensual</option><option value="ninguna">Sin comisión</option></select></label>
+          <label class="cfg-field"><span>Comisión del abogado en edificios nuevos</span>
+            <select data-ajuste="comisionTipo"><option value="porcentaje">Porcentaje de lo cobrado</option><option value="fijo">Monto fijo por apartamento alquilado</option><option value="ninguna">Sin comisión</option></select></label>
           <label class="cfg-field"><span>Valor de la comisión</span>
             <input type="number" min="0" step="0.01" data-ajuste="comisionValor" data-tipo="numero" placeholder="Ej: 10"></label>
           <label class="cfg-field"><span>Papel para imprimir</span>
@@ -1721,6 +1765,12 @@
           <label class="cfg-field"><span>ITBIS sobre la comisión (%)</span>
             <input type="number" min="0" max="100" step="0.01" data-ajuste="itbisComision" data-tipo="numero" placeholder="Vacío: no se aplica"></label>
         </div>
+      </section>
+
+      <section class="mgmt-card cfg-card cfg-wide solo-completo">
+        <h3>Liquidaciones por edificio</h3>
+        <p class="cfg-desc">Si un edificio descuenta los gastos, se restan de lo que se transfiere al propietario en su liquidación. Si no, la liquidación solo descuenta tu comisión.</p>
+        <div class="cfg-fields" id="cfgLiqEdificios"></div>
       </section>
 
       <section class="mgmt-card cfg-card">
@@ -1743,11 +1793,15 @@
         </div>
       </section>
 
-      <section class="mgmt-card cfg-card">
+      <section class="mgmt-card cfg-card solo-completo">
         <h3>Integraciones</h3>
         <div class="cfg-row">
           <div><strong>Verificación de cédulas con la JCE (Didit)</strong><span id="cfgDidit">—</span></div>
           <button type="button" class="btn-panel" data-didit-open>Configurar</button>
+        </div>
+        <div class="cfg-row">
+          <div><strong>Correo para recordatorios</strong><span id="cfgCorreo">—</span></div>
+          <button type="button" class="btn-panel" data-correo-open>Configurar</button>
         </div>
       </section>
 
@@ -1882,6 +1936,7 @@
         <button type="button" data-command="insertOrderedList" title="Lista numerada"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v4M4 9h3M4 14h3l-3 4h3M10 7h10M10 12h10M10 17h10"/></svg></button>
         <button type="button" data-command="outdent" title="Reducir sangría"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M11 10h9M11 14h9M4 18h16M7 10l-3 2 3 2"/></svg></button>
         <button type="button" data-command="indent" title="Aumentar sangría"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M11 10h9M11 14h9M4 18h16M4 10l3 2-3 2"/></svg></button>
+        <button type="button" id="btnInterlineado" title="Interlineado y espacio entre párrafos (Ctrl+1, Ctrl+5, Ctrl+2)" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 6h10M11 12h10M11 18h10M5 4v16M2.5 6.5 5 4l2.5 2.5M2.5 17.5 5 20l2.5-2.5"/></svg></button>
         <span class="format-separator"></span>
         <button type="button" data-command="createLink" title="Insertar enlace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
         <button type="button" data-command="removeFormat" title="Quitar formato"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M12 5l-3 14M4 20l16-16"/></svg></button>
@@ -1892,7 +1947,6 @@
         <!-- Pantalla de inicio mientras no hay documento -->
         <div class="rd-empty" id="rdEmpty">
           <h3>Empieza un documento</h3>
-          <p>Escribe desde cero, pega el texto de un contrato o parte de un modelo guardado.</p>
           <div class="rd-empty-actions">
             <button type="button" class="rd-start" data-rd-start="blanco"><strong>Documento en blanco</strong><span>Escribe directamente en la página.</span></button>
             <button type="button" class="rd-start" data-rd-start="texto"><strong>Cargar texto</strong><span>Pega el texto (y las imágenes) de un contrato.</span></button>
@@ -1915,6 +1969,15 @@
               <option value="Tabloid">Tabloid</option>
             </select>
           </label>
+          <label class="footer-field" title="Márgenes de la página (los mismos al imprimir)">Márgenes
+            <select id="margenSelect">
+              <option value="1.27">Estrechos (1,27 cm)</option>
+              <option value="1.91">Moderados (1,91 cm)</option>
+              <option value="2" selected>Estándar (2 cm)</option>
+              <option value="2.54">Normales de Word (2,54 cm)</option>
+              <option value="3.18">Amplios (3,18 cm)</option>
+            </select>
+          </label>
           <label class="footer-field" for="landscapeCheckbox"><input type="checkbox" id="landscapeCheckbox"> Horizontal</label>
           <div class="zoom-control">
             <button type="button" id="zoomOut" title="Alejar">−</button>
@@ -1931,11 +1994,39 @@
 </div><!-- /.app-main -->
 </div><!-- /.app-shell -->
 
+<!-- Menú de interlineado del redactor (se abre bajo su botón) -->
+<div class="fmt-menu" id="menuInterlineado" role="menu" hidden>
+  <div class="fmt-menu-title">Interlineado</div>
+  <div class="fmt-menu-grid">
+    <button type="button" data-interlineado="1">1,0</button>
+    <button type="button" data-interlineado="1.15">1,15</button>
+    <button type="button" data-interlineado="1.5">1,5</button>
+    <button type="button" data-interlineado="2">2,0</button>
+    <button type="button" data-interlineado="2.5">2,5</button>
+    <button type="button" data-interlineado="3">3,0</button>
+  </div>
+  <div class="fmt-menu-fino">
+    <button type="button" data-interlineado-paso="-0.1" title="Reducir el interlineado">− Juntar líneas</button>
+    <button type="button" data-interlineado-paso="0.1" title="Ampliar el interlineado">+ Separar líneas</button>
+  </div>
+  <div class="fmt-menu-title">Espacio entre párrafos</div>
+  <div class="fmt-menu-grid dos">
+    <button type="button" data-parrafo="0">Ninguno</button>
+    <button type="button" data-parrafo="6">Pequeño</button>
+    <button type="button" data-parrafo="12">Normal</button>
+    <button type="button" data-parrafo="18">Amplio</button>
+  </div>
+  <div class="fmt-menu-sep"></div>
+  <button type="button" class="fmt-menu-accion" data-accion="quitar-vacias">Quitar líneas vacías<span>Elimina los renglones en blanco y los saltos de línea dobles</span></button>
+  <label class="fmt-menu-check"><input type="checkbox" id="interlineadoTodo"> Aplicar a todo el documento</label>
+  <div class="fmt-menu-nota" id="interlineadoNota"></div>
+</div>
+
 <!-- Modal: insertar/editar campo -->
 <div class="overlay" id="fieldOverlay">
   <div class="modal">
     <h3 id="fieldModalTitle">Insertar campo</h3>
-    <div class="modal-sub">Completa los datos del campo. Si usas un nombre de la lista (p. ej. "Nombre del inquilino"), se rellenará solo con los datos del contrato.</div>
+    <div class="modal-sub">Con un nombre de la lista se rellena solo.</div>
     <label for="fieldLabel">Nombre del campo (referencia interna)</label>
     <input type="text" id="fieldLabel" placeholder="Ej: Nombre del inquilino" list="fieldLabelSuggestions" autocomplete="off">
     <datalist id="fieldLabelSuggestions"></datalist>
@@ -1968,7 +2059,7 @@
 <div class="overlay" id="templateSaveOverlay">
   <div class="modal">
     <h3>Guardar como modelo</h3>
-    <div class="modal-sub">Se guarda en la subcarpeta "Modelos" de tu carpeta de trabajo, para reutilizarlo en otros contratos.</div>
+    <div class="modal-sub">Se guarda en la carpeta Modelos.</div>
     <label for="templateNameInput">Nombre del modelo</label>
     <input type="text" id="templateNameInput" placeholder="Ej: Contrato de arrendamiento">
     <div class="modal-actions">
@@ -2025,7 +2116,7 @@
 <div class="overlay" id="templatePickerOverlay">
   <div class="modal modal-form">
     <h3>Redactar documento del contrato</h3>
-    <div class="modal-sub" id="templatePickerSub">Elige un modelo. Los campos con nombres reconocidos se rellenan solos con los datos del contrato.</div>
+    <div class="modal-sub" id="templatePickerSub">Elige un modelo.</div>
     <div class="pick-list" id="templatePickerList"></div>
     <div class="modal-actions">
       <button type="button" class="btn-text" id="templatePickerCancel">Cancelar</button>
@@ -2056,7 +2147,6 @@
     <h3 id="envioTitulo">Estados de cuenta</h3>
     <div class="modal-sub" id="envioSub"></div>
     <div class="lote-lista" id="envioLista"></div>
-    <p class="mgmt-note">"PDF" guarda el estado de cuenta; WhatsApp y correo envían un resumen (adjunta el PDF en el mensaje) y lo marcan como enviado.</p>
     <div class="modal-actions">
       <button type="button" class="btn-text" id="envioClose">Cerrar</button>
       <button type="button" class="btn-panel" id="envioTodos">Todos en un PDF</button>
@@ -2103,8 +2193,18 @@
   <div class="modal modal-form modal-lote">
     <h3>Recordatorios de pago</h3>
     <div class="modal-sub" id="loteSub"></div>
+    <div class="lote-todos">
+      <button type="button" class="btn-brass" id="loteTodos">Enviar a todos</button>
+      <label class="lote-opcion"><input type="checkbox" id="loteWaTambien"> WhatsApp también a quien recibe correo</label>
+      <span class="lote-estado" id="loteEstado" aria-live="polite"></span>
+    </div>
+    <div class="lote-guia" id="loteGuia" hidden>
+      <div class="lote-guia-main"><span class="lote-guia-paso" id="loteGuiaPaso"></span><strong id="loteGuiaNombre"></strong></div>
+      <button type="button" class="btn-text" id="loteGuiaDetener">Detener</button>
+      <button type="button" class="btn-panel" id="loteGuiaSaltar">Saltar</button>
+      <button type="button" class="btn-brass" id="loteGuiaAbrir">Abrir WhatsApp ⏎</button>
+    </div>
     <div class="lote-lista" id="loteLista"></div>
-    <p class="mgmt-note">Cada botón abre WhatsApp o el correo con el mensaje listo; el envío se anota en el seguimiento del inquilino. "Ver mensaje" permite editarlo antes.</p>
     <div class="modal-actions"><button type="button" class="btn-text" id="loteClose">Cerrar</button></div>
   </div>
 </div>
@@ -2187,6 +2287,40 @@
   </div>
 </div>
 
+<!-- Modal: correo de envío para los recordatorios -->
+<div class="overlay" id="correoOverlay">
+  <div class="modal modal-form">
+    <h3>Correo para recordatorios</h3>
+    <div class="modal-sub">Los recordatorios salen desde esta cuenta, sin abrir tu programa de correo.</div>
+    <div class="didit-status" id="correoEstado"></div>
+    <div class="didit-prueba" id="correoPrueba" aria-live="polite"></div>
+    <label for="correoProveedor">Proveedor</label>
+    <select id="correoProveedor">
+      <option value="gmail">Gmail</option>
+      <option value="yahoo">Yahoo</option>
+      <option value="otro">Otro (servidor propio)</option>
+    </select>
+    <div class="correo-servidor" id="correoServidor" hidden>
+      <div><label for="correoHost">Servidor SMTP</label><input type="text" id="correoHost" placeholder="smtp.midominio.com" autocomplete="off"></div>
+      <div><label for="correoPuerto">Puerto</label><input type="number" id="correoPuerto" min="1" max="65535" value="465"></div>
+    </div>
+    <label for="correoUsuario">Tu correo</label>
+    <input type="email" id="correoUsuario" placeholder="despacho@gmail.com" autocomplete="off">
+    <label for="correoPass">Contraseña de aplicación</label>
+    <input type="password" id="correoPass" autocomplete="new-password">
+    <p class="mgmt-note" id="correoAyudaGmail">Gmail: activa la verificación en 2 pasos y crea la contraseña en <button type="button" class="link-btn" id="correoGmailLink">myaccount.google.com/apppasswords</button>.</p>
+    <label for="correoNombre">Nombre del remitente</label>
+    <input type="text" id="correoNombre" maxlength="80" placeholder="Bufete García">
+    <div class="modal-actions">
+      <button type="button" class="btn-wine" id="correoQuitar">Quitar</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn-text" id="correoCerrar">Cerrar</button>
+      <button type="button" class="btn-panel" id="correoProbar">Probar</button>
+      <button type="button" class="btn-brass" id="correoGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: aviso / confirmación (reemplaza alert()/confirm() nativos) -->
 <div class="overlay" id="noticeOverlay">
   <div class="modal">
@@ -2228,7 +2362,61 @@
       value = url;
     }
     document.execCommand(command, false, value || null);
+    formatoACampos(command, value);
     editor.dispatchEvent(new Event('input', { bubbles:true }));
+  }
+
+  // Los campos son contenteditable="false" y el navegador no les aplica el
+  // formato de la selección (envuelve el texto de alrededor y los salta):
+  // se les pone el mismo formato como estilo propio, que se conserva al
+  // rellenarlos, al guardar y al imprimir.
+  const TAMANOS_FONT = ['', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large'];
+  function formatoACampos(command, value){
+    const sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+    const rango = sel.getRangeAt(0);
+    const campos = [...editor.querySelectorAll('.campo')].filter(c => rango.intersectsNode(c));
+    if (!campos.length) return;
+    const activo = (cmd) => document.queryCommandState(cmd);
+    const decoracion = (c, linea, poner) => {
+      const lineas = new Set((c.style.textDecorationLine || c.style.textDecoration || '').split(/\s+/).filter(l => l === 'underline' || l === 'line-through'));
+      if (poner) lineas.add(linea); else lineas.delete(linea);
+      c.style.textDecoration = [...lineas].join(' ');
+    };
+    campos.forEach(c => {
+      if (command === 'fontName') c.style.fontFamily = /\s/.test(value) ? '"' + value + '"' : value;
+      else if (command === 'fontSize') c.style.fontSize = TAMANOS_FONT[Number(value)] || '';
+      else if (command === 'foreColor') c.style.color = value;
+      else if (command === 'bold') c.style.fontWeight = activo('bold') ? 'bold' : 'normal';
+      else if (command === 'italic') c.style.fontStyle = activo('italic') ? 'italic' : 'normal';
+      else if (command === 'underline') decoracion(c, 'underline', activo('underline'));
+      else if (command === 'strikeThrough') decoracion(c, 'line-through', activo('strikeThrough'));
+      else if (command === 'removeFormat') c.removeAttribute('style');
+      else return;
+      if (!c.getAttribute('style')) c.removeAttribute('style');
+    });
+  }
+
+  // Un campo nuevo toma la fuente, el tamaño y el estilo del texto donde se
+  // inserta (si ese texto tiene un formato distinto del que heredaría).
+  function igualarCampoAlTexto(span){
+    let vecino = span.previousSibling;
+    while (vecino && vecino.nodeType === 3 && !vecino.textContent.trim()) vecino = vecino.previousSibling;
+    if (!vecino) { vecino = span.nextSibling; while (vecino && vecino.nodeType === 3 && !vecino.textContent.trim()) vecino = vecino.nextSibling; }
+    if (!vecino || (vecino.nodeType === 1 && vecino.classList.contains('campo'))) return;
+    let ref = vecino.nodeType === 3 ? vecino.parentElement : vecino;
+    // Si el vecino es un elemento con formato (p. ej. <font>), su último texto manda.
+    if (ref && ref !== span.parentElement && ref.nodeType === 1) {
+      const textos = [...ref.querySelectorAll('*')].filter(e => e.firstChild && e.firstChild.nodeType === 3);
+      if (textos.length) ref = textos[textos.length - 1];
+    }
+    if (!ref || !editor.contains(ref)) return;
+    const a = getComputedStyle(ref), b = getComputedStyle(span);
+    if (a.fontFamily !== b.fontFamily) span.style.fontFamily = a.fontFamily;
+    if (a.fontSize !== b.fontSize) span.style.fontSize = a.fontSize;
+    if (a.fontStyle !== b.fontStyle) span.style.fontStyle = a.fontStyle;
+    // El color solo si el texto tiene uno propio (el campo se pinta con el de resaltado).
+    if (a.color !== getComputedStyle(editor).color) span.style.color = a.color;
   }
 
   if (formatbar) {
@@ -2947,6 +3135,7 @@
       try {
         const range = getRangeInside(editor, savedRange);
         insertNodeAtRange(range, span);
+        igualarCampoAlTexto(span);
         const spaceNode = document.createTextNode('\u00A0');
         span.after(spaceNode);
         const newRange = document.createRange();
@@ -3439,7 +3628,7 @@
     templateSaveOverlay.classList.remove('show');
     try {
       deselectAllImages();
-      const file = await writeTemplate(name, editor.innerHTML);
+      const file = await writeTemplate(name, htmlDelEditor());
       if (!file) return;
       saveStatus.textContent = 'Modelo "' + templateNameOf(file) + '" guardado en la carpeta Modelos.';
       await refreshWorkFolder();
@@ -3543,7 +3732,12 @@
       span.className = 'campo';
       span.id = 'campo-' + Date.now() + '-' + (restoreCounter++);
       span.setAttribute('contenteditable', 'false');
-      span.removeAttribute('style');
+      // Se conserva su formato (fuente, tamaño...). Solo se quita lo que las
+      // versiones antiguas añadían para Word: fondo transparente, línea inferior y seminegrita.
+      if (span.style.background === 'transparent' || span.style.backgroundColor === 'transparent') { span.style.background = ''; }
+      if (span.style.borderBottom) span.style.borderBottom = '';
+      if (span.style.fontWeight === '600') span.style.fontWeight = '';
+      if (!span.getAttribute('style')) span.removeAttribute('style');
       renderFieldContent(span, span.getAttribute('data-label') || 'Campo', span.getAttribute('data-value') || '');
     });
 
@@ -3628,9 +3822,18 @@
 
   function buildExportHtml(){
     const clone = editor.cloneNode(true);
+    limpiarPaginacion(clone);
+    const escala = escalaEditor();
+    const pagina = medidasPx();
     clone.querySelectorAll('.campo').forEach(span => {
       const value = span.getAttribute('data-value') || '';
       if (!value.trim()) span.textContent = '';
+      // En el editor el campo respeta los saltos de línea del valor
+      // (white-space: pre-wrap); fuera de él hacen falta <br>.
+      else if (value.includes('\n')) {
+        span.textContent = '';
+        value.split('\n').forEach((linea, i) => { if (i) span.appendChild(document.createElement('br')); span.appendChild(document.createTextNode(linea)); });
+      }
       span.removeAttribute('contenteditable');
       span.removeAttribute('id');
       span.removeAttribute('class');
@@ -3641,15 +3844,23 @@
       if (!img) { wrap.remove(); return; }
       const mode = (liveWrap && liveWrap.dataset.wrap) || 'inline';
       const liveImg = liveWrap ? liveWrap.querySelector('img') : null;
-      const w = liveImg && liveImg.style.width ? liveImg.style.width : 'auto';
+      // Sin tamaño propio, la imagen se exporta con el ancho que tiene en la
+      // hoja (en el editor está limitada), para que ocupe lo mismo al imprimir.
+      const anchoVisto = liveImg ? Math.round(liveImg.getBoundingClientRect().width / escala) : 0;
+      const w = liveImg && liveImg.style.width ? liveImg.style.width : (anchoVisto ? anchoVisto + 'px' : 'auto');
       const h = liveImg && liveImg.style.height ? liveImg.style.height : 'auto';
       let styleStr = `max-width:100%;width:${w};height:${h};`;
       if (mode === 'wrap') {
         styleStr += 'float:left;margin:6px 18px 12px 0;';
       } else if (mode === 'free') {
-        const left = liveWrap ? (liveWrap.style.left || '0px') : '0px';
-        const top = liveWrap ? (liveWrap.style.top || '0px') : '0px';
-        styleStr += `position:absolute;left:${left};top:${top};`;
+        // En el editor la posición cuenta desde la esquina de la hoja (con
+        // margen y huecos entre hojas); al imprimir, desde el área de texto
+        // de la primera página, con las páginas seguidas.
+        const left = liveWrap ? (parseFloat(liveWrap.style.left) || 0) : 0;
+        const top = liveWrap ? (parseFloat(liveWrap.style.top) || 0) : 0;
+        const n = Math.max(0, Math.floor(top / pagina.paso));
+        const dentro = top - n * pagina.paso - pagina.margen;
+        styleStr += `position:absolute;left:${Math.round(left - pagina.margen)}px;top:${Math.round(n * (pagina.alto - 2 * pagina.margen) + dentro)}px;`;
       } else {
         styleStr += 'display:inline-block;margin:8px 4px;';
       }
@@ -3690,6 +3901,7 @@
           bodyHtml,
           pageSize: chosenPageSize,
           landscape: chosenLandscape,
+          margen: margenSelect.value + 'cm',
           title
         });
         if (!result || !result.success) {
@@ -3717,17 +3929,21 @@
 <meta charset="UTF-8">
 <title>${title}</title>
 <style>
-  @page { size: ${pageSizeCss}; margin: 2cm; }
+  @page { size: ${pageSizeCss}; margin: ${margenSelect.value}cm; }
   html,body{ margin:0; padding:0; }
   body{
     font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     font-size:12pt;
     line-height:1.6;
     color:#1a1a1a;
-    padding: 24px 32px;
     background:#fff;
+    position:relative;
   }
   p{ margin:0 0 12pt 0; }
+  h1{ font-size:20pt; line-height:1.3; margin:0 0 12pt; }
+  h2{ font-size:16pt; line-height:1.3; margin:14pt 0 8pt; }
+  h3{ font-size:13pt; line-height:1.3; margin:12pt 0 6pt; }
+  p, li, h1, h2, h3, blockquote, tr{ break-inside:avoid; }
   img{ max-width:100%; }
 </style>
 </head>
@@ -3748,6 +3964,7 @@
         bodyHtml: buildExportHtml(),
         pageSize: paperSizeSelect ? paperSizeSelect.value : 'Letter',
         landscape: landscapeCheckbox ? landscapeCheckbox.checked : false,
+        margen: margenSelect.value + 'cm',
         title: baseNameInput.value.trim() || 'contrato'
       });
       if (r && r.ok) saveStatus.textContent = 'PDF guardado: ' + r.name + '.';
@@ -3757,47 +3974,76 @@
     }
   });
 
-  // Documento .doc: HTML que Word abre directamente.
+  // Documento .doc: HTML que Word abre directamente, con el papel, la
+  // orientación y los márgenes del redactor (sección de página de Word).
   function buildDocHtml(bodyHtml, title){
+    const m = medidasPagina();
+    const margen = margenSelect.value + 'cm';
     return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset="utf-8"><title>${title}</title>
 <style>
-  body{ font-family:"Georgia","Times New Roman",serif; font-size:12pt; color:#1a1a1a; line-height:1.5; position:relative; }
+  @page WordSection1{ size:${m.w} ${m.h};${landscapeCheckbox.checked ? ' mso-page-orientation:landscape;' : ''} margin:${margen}; }
+  div.WordSection1{ page:WordSection1; }
+  body{ font-family:"Source Serif 4","Georgia","Times New Roman",serif; font-size:12pt; color:#1a1a1a; line-height:1.6; position:relative; }
   p{ margin:0 0 12pt 0; }
+  h1{ font-size:20pt; line-height:1.3; margin:0 0 12pt; }
+  h2{ font-size:16pt; line-height:1.3; margin:14pt 0 8pt; }
+  h3{ font-size:13pt; line-height:1.3; margin:12pt 0 6pt; }
   img{ max-width:100%; }
 </style>
 </head>
-<body>${bodyHtml}</body></html>`;
+<body><div class="WordSection1">${bodyHtml}</div></body></html>`;
   }
 
   // ---------- API para el m\u00f3dulo de gesti\u00f3n (gestion.js) ----------
   // gestion.js vive en su propio archivo y no ve las variables de este
   // bloque; esto es lo \u00fanico que necesita del editor y de los avisos.
   // ---------- Espacio de trabajo del redactor ----------
-  // La página se dibuja con el tamaño real del papel elegido y los mismos
-  // márgenes de la impresión (2 cm), con líneas donde caen los saltos de
-  // página. El zoom se ajusta solo al ancho disponible hasta que se usa
-  // "+" o "−"; "Ajustar" lo vuelve a activar.
+  // Como en Word: cada hoja se dibuja con el tamaño real del papel y los
+  // márgenes elegidos, separada de la siguiente por un hueco. El paginado
+  // empuja cada párrafo que no cabe al principio de la hoja siguiente, y al
+  // imprimir se usa la misma regla (los párrafos no se parten), así que lo
+  // que se ve en cada hoja es lo que sale en cada página. El zoom se ajusta
+  // solo al ancho disponible hasta que se usa "+" o "−"; "Ajustar" lo vuelve
+  // a activar.
   const rdShell = document.getElementById('rdShell');
   const rdDesk = document.getElementById('rdDesk');
   const rdEmpty = document.getElementById('rdEmpty');
   const rdStats = document.getElementById('rdStats');
   const rdPanelToggle = document.getElementById('rdPanelToggle');
   const formatBlockSelect = document.getElementById('formatBlockSelect');
+  const margenSelect = document.getElementById('margenSelect');
   const PAPELES = { Letter:['8.5in','11in'], A4:['210mm','297mm'], Legal:['8.5in','14in'], A3:['297mm','420mm'], A5:['148mm','210mm'], Tabloid:['11in','17in'] };
   const aPx = (v) => parseFloat(v) * (v.endsWith('in') ? 96 : 96 / 25.4);
+  const HUECO_HOJAS = 24; // px entre hojas, solo en pantalla
+  const MARGEN_KEY = 'renthouse.redactorMargen';
   let zoomAuto = true;
+  let totalPaginas = 1;
 
   function medidasPagina(){
     const [w, h] = PAPELES[paperSizeSelect.value] || PAPELES.Letter;
     return landscapeCheckbox.checked ? { w: h, h: w } : { w, h };
+  }
+  // Medidas de la hoja en px de CSS (sin zoom): alto, margen y distancia
+  // entre el principio de una hoja y el de la siguiente.
+  function medidasPx(){
+    const alto = aPx(medidasPagina().h);
+    const margen = parseFloat(margenSelect.value) * 96 / 2.54;
+    return { alto, margen, paso: alto + HUECO_HOJAS };
+  }
+  // Relación entre lo que mide la hoja en pantalla y su tamaño en CSS (zoom).
+  function escalaEditor(){
+    return (editor.offsetHeight && editor.getBoundingClientRect().height / editor.offsetHeight) || 1;
   }
 
   function aplicarPapel(){
     const m = medidasPagina();
     editor.style.setProperty('--page-w', m.w);
     editor.style.setProperty('--page-h', m.h);
-    if (zoomAuto) ajustarZoom(); else actualizarStats();
+    editor.style.setProperty('--margen', margenSelect.value + 'cm');
+    editor.style.setProperty('--page-gap', HUECO_HOJAS + 'px');
+    if (zoomAuto) ajustarZoom();
+    paginar();
   }
 
   function ajustarZoom(){
@@ -3811,25 +4057,233 @@
   function actualizarStats(){
     if (!hasContent) { rdStats.textContent = ''; return; }
     const palabras = ((editor.innerText || '').match(/\S+/g) || []).length;
-    const altoPagina = aPx(medidasPagina().h) * editorZoom / 100;
-    const paginas = Math.max(1, Math.ceil((editor.getBoundingClientRect().height - 2) / altoPagina));
-    rdStats.textContent = palabras.toLocaleString() + (palabras === 1 ? ' palabra' : ' palabras') + ' · ' + paginas + (paginas === 1 ? ' página' : ' páginas');
+    rdStats.textContent = palabras.toLocaleString() + (palabras === 1 ? ' palabra' : ' palabras') + ' · ' + totalPaginas + (totalPaginas === 1 ? ' página' : ' páginas');
   }
+
+  // Bloques de texto (párrafos, títulos, elementos de lista...) en el orden
+  // del documento: los contenedores con bloques dentro se recorren, y los
+  // saltos de página manuales se incluyen si se piden (para el paginado).
+  const TAGS_BLOQUE = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE', 'TABLE']);
+  function bloquesDelDocumento(conSaltos){
+    const out = [];
+    (function recorrer(nodo){
+      [...nodo.children].forEach(el => {
+        if (el.classList.contains('salto-pagina')) { if (conSaltos) out.push(el); return; }
+        if (!TAGS_BLOQUE.has(el.tagName) || el.classList.contains('img-wrap')) return;
+        if (el.tagName !== 'TABLE' && [...el.children].some(h => TAGS_BLOQUE.has(h.tagName))) recorrer(el);
+        else out.push(el);
+      });
+    })(editor);
+    return out;
+  }
+
+  // Lo que añade el paginado no forma parte del documento.
+  function limpiarPaginacion(root){
+    root.querySelectorAll('.pag-salto').forEach(el => {
+      el.classList.remove('pag-salto');
+      el.style.removeProperty('--pag');
+      if (!el.getAttribute('class')) el.removeAttribute('class');
+      if (!el.getAttribute('style')) el.removeAttribute('style');
+    });
+  }
+  function htmlDelEditor(){
+    const clone = editor.cloneNode(true);
+    limpiarPaginacion(clone);
+    return clone.innerHTML;
+  }
+
+  function paginar(){
+    if (!hasContent || editor.hidden) return;
+    const { alto, margen, paso } = medidasPx();
+    limpiarPaginacion(editor);
+    const escala = escalaEditor();
+    const origen = editor.getBoundingClientRect().top;
+    const bloques = bloquesDelDocumento(true).map(el => {
+      const r = el.getBoundingClientRect();
+      return { el, top: (r.top - origen) / escala, alto: r.height / escala };
+    });
+    let desplazado = 0, paginaForzada = null, fin = 0;
+    bloques.forEach(b => {
+      const top = b.top + desplazado;
+      if (b.el.classList.contains('salto-pagina')) { paginaForzada = Math.floor(top / paso) + 1; fin = Math.max(fin, top); return; }
+      const pagina = Math.floor(top / paso);
+      const finTexto = pagina * paso + alto - margen;
+      let destino = null;
+      if (paginaForzada !== null) destino = paginaForzada * paso + margen;
+      // No cabe en lo que queda de la hoja (y sí en una hoja entera), o empieza en el margen inferior.
+      else if ((top + b.alto > finTexto + 0.5 && b.alto <= alto - 2 * margen) || top > finTexto) destino = (pagina + 1) * paso + margen;
+      paginaForzada = null;
+      if (destino !== null && destino > top + 0.5) {
+        const empuje = Math.round((destino - top) * 100) / 100;
+        b.el.classList.add('pag-salto');
+        b.el.style.setProperty('--pag', empuje + 'px');
+        desplazado += empuje;
+        fin = Math.max(fin, top + empuje + b.alto);
+      } else {
+        fin = Math.max(fin, top + b.alto);
+      }
+    });
+    totalPaginas = Math.max(1, Math.floor((fin + margen - 1) / paso) + 1, paginaForzada !== null ? paginaForzada + 1 : 1);
+    editor.style.minHeight = (totalPaginas * paso - HUECO_HOJAS) + 'px';
+    actualizarStats();
+  }
+
+  // Se repagina un momento después de cada cambio (escribir, pegar, mover
+  // o redimensionar imágenes); los cambios del propio paginado se ignoran.
+  let paginarTimer = null;
+  function programarPaginado(){ clearTimeout(paginarTimer); paginarTimer = setTimeout(paginar, 120); }
+  new MutationObserver((cambios) => {
+    if (cambios.some(c => c.type !== 'attributes' || c.target.tagName === 'IMG' || (c.target.classList && c.target.classList.contains('img-wrap')))) programarPaginado();
+  }).observe(editor, { childList:true, characterData:true, subtree:true, attributes:true, attributeFilter:['style'] });
+  // Un párrafo nuevo (Enter) copia los atributos del anterior, también el
+  // empuje del paginado: se repagina al momento para que no se vea el salto.
+  editor.addEventListener('input', (e) => { if (e.inputType === 'insertParagraph') { clearTimeout(paginarTimer); paginar(); } });
+  editor.addEventListener('load', programarPaginado, true); // imágenes que terminan de cargar
+  if (document.fonts) document.fonts.addEventListener('loadingdone', programarPaginado);
 
   // Pantalla de inicio o página, según haya documento.
   function syncEstadoEditor(){
     rdEmpty.hidden = hasContent;
     editor.hidden = !hasContent;
-    if (hasContent && zoomAuto) ajustarZoom(); else actualizarStats();
+    if (hasContent && zoomAuto) ajustarZoom();
+    paginar();
+    actualizarStats();
   }
 
+  try { const m = localStorage.getItem(MARGEN_KEY); if (m && [...margenSelect.options].some(o => o.value === m)) margenSelect.value = m; } catch (err) { /* no crítico */ }
   paperSizeSelect.addEventListener('change', aplicarPapel);
   landscapeCheckbox.addEventListener('change', aplicarPapel);
+  margenSelect.addEventListener('change', () => {
+    try { localStorage.setItem(MARGEN_KEY, margenSelect.value); } catch (err) { /* no crítico */ }
+    aplicarPapel();
+  });
   [zoomOut, zoomIn].forEach(b => b.addEventListener('click', () => { zoomAuto = false; actualizarStats(); }));
   document.getElementById('zoomFit').addEventListener('click', () => { zoomAuto = true; ajustarZoom(); });
   new ResizeObserver(() => { if (zoomAuto && hasContent) ajustarZoom(); }).observe(rdDesk);
   let statsTimer = null;
   editor.addEventListener('input', () => { clearTimeout(statsTimer); statsTimer = setTimeout(actualizarStats, 300); });
+
+  // ---------- Interlineado y espacio entre párrafos ----------
+  // Como el botón de Word: se aplica a los párrafos de la selección (o al
+  // del cursor), o a todo el documento si se marca la casilla.
+  const btnInterlineado = document.getElementById('btnInterlineado');
+  const menuInterlineado = document.getElementById('menuInterlineado');
+  const interlineadoTodo = document.getElementById('interlineadoTodo');
+  const interlineadoNota = document.getElementById('interlineadoNota');
+
+  function rangoEnEditor(){
+    const sel = window.getSelection();
+    if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) return sel.getRangeAt(0);
+    return savedRange && editor.contains(savedRange.commonAncestorContainer) ? savedRange : null;
+  }
+  function bloquesElegidos(){
+    const bloques = bloquesDelDocumento(false);
+    if (interlineadoTodo.checked) return bloques;
+    const rango = rangoEnEditor();
+    if (!rango) return [];
+    let elegidos = bloques.filter(b => rango.intersectsNode(b));
+    if (!elegidos.length) {
+      // Texto suelto, fuera de cualquier párrafo: se envuelve en uno.
+      document.execCommand('formatBlock', false, '<p>');
+      const r2 = rangoEnEditor();
+      elegidos = r2 ? bloquesDelDocumento(false).filter(b => r2.intersectsNode(b)) : [];
+    }
+    return elegidos;
+  }
+  function interlineadoDe(el){
+    const cs = getComputedStyle(el);
+    const lh = parseFloat(cs.lineHeight), fs = parseFloat(cs.fontSize);
+    return lh && fs ? lh / fs : 1.6;
+  }
+  const nParrafos = (n) => n + (n === 1 ? ' párrafo' : ' párrafos');
+  const fmtCifra = (n) => (Math.round(n * 100) / 100).toLocaleString('es', { minimumFractionDigits: 1 });
+  function avisarInterlineado(texto){ interlineadoNota.textContent = texto; }
+  function trasCambioDeFormato(){
+    editor.dispatchEvent(new Event('input', { bubbles:true }));
+    paginar();
+    marcarMenuInterlineado();
+  }
+
+  function aplicarInterlineado(valor, paso){
+    const bloques = bloquesElegidos();
+    if (!bloques.length) { avisarInterlineado('Pon el cursor en un párrafo o selecciona texto.'); return; }
+    bloques.forEach(b => {
+      const nuevo = paso ? Math.min(4, Math.max(0.8, interlineadoDe(b) + paso)) : valor;
+      b.style.lineHeight = String(Math.round(nuevo * 100) / 100);
+    });
+    avisarInterlineado(nParrafos(bloques.length) + ' · interlineado ' + fmtCifra(Number(bloques[0].style.lineHeight)));
+    trasCambioDeFormato();
+  }
+  function aplicarEspacioParrafos(pt){
+    const bloques = bloquesElegidos();
+    if (!bloques.length) { avisarInterlineado('Pon el cursor en un párrafo o selecciona texto.'); return; }
+    bloques.forEach(b => {
+      if (/^H[1-6]$/.test(b.tagName)) { b.style.marginBottom = Math.max(pt, 4) + 'pt'; return; }
+      b.style.marginTop = '0pt';
+      b.style.marginBottom = pt + 'pt';
+    });
+    avisarInterlineado(nParrafos(bloques.length) + ' · ' + (pt ? pt + ' pt después de cada párrafo' : 'sin espacio entre párrafos'));
+    trasCambioDeFormato();
+  }
+  // Quita los párrafos vacíos y deja un solo salto donde había varios seguidos.
+  function quitarLineasVacias(){
+    const rango = rangoEnEditor();
+    const todo = interlineadoTodo.checked || !rango || rango.collapsed;
+    const bloques = todo ? bloquesDelDocumento(false) : bloquesElegidos();
+    let quitadas = 0;
+    bloques.forEach(b => {
+      const vacio = !b.textContent.replace(/[\s ​]/g, '') && !b.querySelector('img, .campo, .img-wrap, hr, table');
+      if (vacio && bloquesDelDocumento(false).length > 1) { b.remove(); quitadas++; return; }
+      b.querySelectorAll('br').forEach(br => {
+        let sig = br.nextSibling;
+        while (sig && sig.nodeType === 3 && !sig.textContent.replace(/[\s ]/g, '')) sig = sig.nextSibling;
+        if (sig && sig.nodeName === 'BR') { br.remove(); quitadas++; }
+      });
+    });
+    avisarInterlineado(quitadas ? 'Se quitaron ' + quitadas + (quitadas === 1 ? ' línea vacía' : ' líneas vacías') + (todo ? ' del documento.' : ' de la selección.') : 'No había líneas vacías' + (todo ? '.' : ' en la selección.'));
+    if (quitadas) trasCambioDeFormato();
+  }
+
+  // Marca en el menú el interlineado y el espacio del párrafo donde está el cursor.
+  function marcarMenuInterlineado(){
+    const rango = rangoEnEditor();
+    const bloque = rango ? bloquesDelDocumento(false).find(b => rango.intersectsNode(b)) : null;
+    const lh = bloque ? interlineadoDe(bloque) : null;
+    const mb = bloque ? parseFloat(getComputedStyle(bloque).marginBottom) * 72 / 96 : null;
+    menuInterlineado.querySelectorAll('[data-interlineado]').forEach(b => b.classList.toggle('active', lh !== null && Math.abs(Number(b.dataset.interlineado) - lh) < 0.03));
+    menuInterlineado.querySelectorAll('[data-parrafo]').forEach(b => b.classList.toggle('active', mb !== null && Math.abs(Number(b.dataset.parrafo) - mb) < 0.6));
+  }
+  function abrirMenuInterlineado(abrir){
+    menuInterlineado.hidden = !abrir;
+    btnInterlineado.classList.toggle('active', abrir);
+    btnInterlineado.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+    if (!abrir) return;
+    const r = btnInterlineado.getBoundingClientRect();
+    menuInterlineado.style.top = (r.bottom + 6) + 'px';
+    menuInterlineado.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menuInterlineado.offsetWidth - 8)) + 'px';
+    avisarInterlineado('');
+    marcarMenuInterlineado();
+  }
+  btnInterlineado.addEventListener('mousedown', (e) => e.preventDefault());
+  btnInterlineado.addEventListener('click', () => {
+    if (editor.getAttribute('contenteditable') !== 'true') return;
+    abrirMenuInterlineado(menuInterlineado.hidden);
+  });
+  // El menú no se lleva el foco: la selección del texto sigue viva.
+  menuInterlineado.addEventListener('mousedown', (e) => { if (!e.target.closest('label')) e.preventDefault(); });
+  menuInterlineado.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.interlineado) aplicarInterlineado(Number(b.dataset.interlineado));
+    else if (b.dataset.interlineadoPaso) aplicarInterlineado(null, Number(b.dataset.interlineadoPaso));
+    else if (b.dataset.parrafo) aplicarEspacioParrafos(Number(b.dataset.parrafo));
+    else if (b.dataset.accion === 'quitar-vacias') quitarLineasVacias();
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!menuInterlineado.hidden && !menuInterlineado.contains(e.target) && !btnInterlineado.contains(e.target)) abrirMenuInterlineado(false);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menuInterlineado.hidden) abrirMenuInterlineado(false); });
+  rdDesk.addEventListener('scroll', () => { if (!menuInterlineado.hidden) abrirMenuInterlineado(false); });
 
   rdEmpty.addEventListener('click', (e) => {
     const b = e.target.closest('[data-rd-start]');
@@ -3883,6 +4337,9 @@
     const tecla = e.key.toLowerCase();
     if (tecla === 's') { e.preventDefault(); btnSaveNow.click(); }
     if (tecla === 'p') { e.preventDefault(); if (hasContent) btnPrint.click(); }
+    // Interlineado como en Word: Ctrl+1 sencillo, Ctrl+5 1,5 y Ctrl+2 doble.
+    const atajo = { '1':1, '5':1.5, '2':2 }[e.key];
+    if (atajo && hasContent && editor.contains(document.activeElement)) { e.preventDefault(); aplicarInterlineado(atajo); }
   });
 
   try { abrirPanel(localStorage.getItem(PANEL_KEY) !== '0'); } catch (err) { abrirPanel(true); }
@@ -3894,7 +4351,7 @@
     hasContent: () => hasContent,
     getHtml(){
       deselectAllImages();
-      return editor.innerHTML;
+      return htmlDelEditor();
     },
     loadHtml: loadIntoEditor,
     // Modelos de la carpeta de trabajo: [{ id, name, mtime }] (vacío si no
@@ -3929,6 +4386,7 @@
 </script>
 <script src="gestion.js"></script>
 <script src="seguridad.js"></script>
+<script src="tour.js"></script>
 
 </body>
 </html>

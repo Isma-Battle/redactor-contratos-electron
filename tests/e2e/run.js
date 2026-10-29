@@ -50,15 +50,46 @@ app.on('browser-window-created', (_e, win) => {
   win.webContents.once('did-finish-load', async () => {
     try {
       const steps = fs.readFileSync(path.join(__dirname, 'pasos.js'), 'utf8');
-      const result = await win.webContents.executeJavaScript(steps);
+      const result = await win.webContents.executeJavaScript('window.__TOKENS = ' + JSON.stringify(tokensLicencia) + ';\n' + steps);
       results.push(...result.log);
     } catch (err) {
       check('los pasos terminan sin excepción (' + (err && err.message ? err.message : err) + ')', false);
     }
-    verificarArchivos();
+    // Si los pasos se cortaron, faltarán archivos: que eso no oculte los resultados.
+    try { verificarArchivos(); } catch (err) { check('comprobación de archivos (' + err.message + ')', false); }
     finalizar();
   });
 });
+
+// Servidor de correo simulado: nodemailer no sale a internet; la contraseña
+// "malamala" se rechaza como en Gmail y lo enviado se guarda para comprobarlo.
+// Licencias: clave de firma de prueba (la app la usa en vez de licencia-publica.pem
+// porque no está empaquetada) y tokens como los que daría el Worker.
+const claveLicencia = require('crypto').generateKeyPairSync('ed25519');
+process.env.RC_LICENCIA_CLAVE_PUBLICA = claveLicencia.publicKey.export({ type: 'spki', format: 'pem' });
+const firmarLicencia = (datos) => {
+  const bytes = Buffer.from(JSON.stringify(datos));
+  return bytes.toString('base64url') + '.' + require('crypto').sign(null, bytes, claveLicencia.privateKey).toString('base64url');
+};
+const tokensLicencia = {
+  redactor: firmarLicencia({ k: 'CLAVE-RED', d: 'equipo-prueba', p: 'redactor', t: Date.now() }),
+  completo: firmarLicencia({ k: 'CLAVE-COMP', d: 'equipo-prueba', p: 'completo', t: Date.now() }),
+  viejo: firmarLicencia({ k: 'CLAVE-RED', d: 'equipo-prueba', p: 'redactor', t: Date.now() - 13 * 3600 * 1000 }),
+  ajeno: firmarLicencia({ k: 'CLAVE-RED', d: 'otro-equipo', p: 'completo', t: Date.now() })
+};
+
+const correosEnviados = [];
+const rutaNodemailer = require.resolve('nodemailer', { paths: [PROJECT] });
+require.cache[rutaNodemailer] = { id: rutaNodemailer, filename: rutaNodemailer, loaded: true, exports: {
+  createTransport: (opts) => ({
+    sendMail: async (m) => {
+      if (opts.auth.pass === 'malamala') { const e = new Error('Invalid login'); e.code = 'EAUTH'; throw e; }
+      correosEnviados.push(Object.assign({ servidor: opts.host + ':' + opts.port, seguro: opts.secure }, m));
+      return { messageId: 'simulado' };
+    },
+    close() {}
+  })
+} };
 
 require(path.join(PROJECT, 'main.js'));
 
@@ -138,6 +169,16 @@ function verificarArchivos() {
   check('acta de devolución imprimible: compara con la entrega, lecturas, fotos y firmas', !!acta && ['Al entregar', 'Regular', 'Malo', 'Lámpara de techo', 'cedula-escaneada.txt', 'Inquilino'].every(x => acta.bodyHtml.includes(x)));
   const datosFinal = JSON.parse(fs.readFileSync(path.join(userData, 'renthouse-datos.json'), 'utf8'));
   check('actas y reparaciones guardadas en los datos', datosFinal.actas.length === 2 && datosFinal.reparaciones.length === 1 && datosFinal.reparaciones[0].gastoId);
+  const configJson = JSON.parse(fs.readFileSync(path.join(userData, 'renthouse-config.json'), 'utf8'));
+  check('la contraseña del correo se guarda cifrada', !!configJson.correo && configJson.correo.user === 'despacho@gmail.com' && !JSON.stringify(configJson).includes('abcdefghijklmnop'));
+  const prueba = correosEnviados.find(m => m.subject === 'Prueba de RentHouse');
+  check('correo de prueba a la propia cuenta, por Gmail (465, SSL)', !!prueba && prueba.to === 'despacho@gmail.com' && prueba.servidor === 'smtp.gmail.com:465' && prueba.seguro === true);
+  const recordatorio = correosEnviados.find(m => m.to === 'inquilino@ejemplo.com');
+  check('recordatorio por correo automático, personalizado', !!recordatorio && recordatorio.subject === 'Recordatorio de pago de alquiler' && /debe|pendiente|adeud/i.test(recordatorio.text) &&
+    correosEnviados.filter(m => m.to === 'inquilino@ejemplo.com').length === new Set(correosEnviados.filter(m => m.to === 'inquilino@ejemplo.com').map(m => m.text)).size);
+  const pdfPaginas = pdfsGuardados.find(p => /paginas_\d+\.pdf$/.test(p.destino));
+  const paginasPdf = pdfPaginas && fs.existsSync(pdfPaginas.destino) ? (fs.readFileSync(pdfPaginas.destino, 'latin1').match(/\/Type\s*\/Page[^s]/g) || []).length : 0;
+  check('el PDF tiene las mismas páginas que las hojas del editor (' + paginasPdf + ')', !!pdfPaginas && paginasPdf === Number(pdfPaginas.destino.match(/paginas_(\d+)\.pdf$/)[1]));
   check('PDF del redactor guardado', pdfsGuardados.some(p => /\.pdf$/.test(p.destino) && !/Recibo_/.test(p.destino) && fs.existsSync(p.destino)));
   check('modelos en la subcarpeta Modelos', listar(path.join(workDir, 'Modelos')).length === 2);
   const exp = fs.existsSync(path.join(workDir, 'Expedientes')) ? fs.readdirSync(path.join(workDir, 'Expedientes')) : [];
@@ -159,8 +200,8 @@ function verificarArchivos() {
   check('recibo con sus datos', !!recibo && ['Juan Pérez', '001-1234567-3', 'RD$ 25,000.00', 'TRX-001', 'María Gómez'].every(s => recibo.bodyHtml.includes(s)) && recibo.pageSize === 'Letter');
   const reciboVarios = printed.find(p => p.bodyHtml.includes('RECIBO DE PAGO') && p.bodyHtml.includes('los meses de'));
   check('recibo de un pago de varios meses', !!reciboVarios && ['enero 2026, febrero 2026 y marzo 2026', 'RD$ 75,000.00', 'TRX-3MESES'].every(s => reciboVarios.bodyHtml.includes(s)));
-  const ecProp = printed.find(p => p.bodyHtml.includes('ESTADO DE CUENTA</div>'));
-  check('estado de cuenta del propietario', !!ecProp && ['María Gómez', '10% de lo cobrado', '123-456789-0', '28,000.00', 'Saldo a favor del propietario'].every(s => ecProp.bodyHtml.includes(s)) && !ecProp.bodyHtml.includes('llave'));
+  const ecProp = printed.find(p => p.bodyHtml.includes('LIQUIDACIÓN</div>'));
+  check('liquidación del edificio', !!ecProp && ['Residencial Las Palmas', 'María Gómez', 'Comisión por apartamento', '10% de lo cobrado', 'Comisión del abogado', '123-456789-0', '28,000.00', 'Saldo a favor del propietario'].every(s => ecProp.bodyHtml.includes(s)) && !ecProp.bodyHtml.includes('llave'));
   const ecInq = printed.find(p => p.bodyHtml.includes('ESTADO DE CUENTA DEL INQUILINO'));
   check('estado de cuenta del inquilino', !!ecInq && ['Juan Pérez', 'Ana Rodríguez', 'Luis Fiador', '10% de la cuota', 'Deuda vencida'].every(s => ecInq.bodyHtml.includes(s)));
 

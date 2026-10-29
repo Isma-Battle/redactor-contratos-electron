@@ -310,14 +310,21 @@
   $('.nav-item[data-view="propietarios"]').click(); await wait();
   check('propietario creado desde el edificio', $('#tablePropietarios').textContent.includes('María Gómez') && $('#tablePropietarios').textContent.includes('5 apartamentos'));
   $('#tablePropietarios [data-act="editar-propietario"]').click(); await wait();
-  set('mf-comisionValor', '10');
+  check('el propietario ya no lleva comisión', !$('#mf-comisionValor'));
   set('mf-cuenta', '123-456789-0');
   set('mf-banco', 'Banco Popular');
   await submit();
-  check('comisión y cuenta', $('#tablePropietarios').textContent.includes('10% de lo cobrado') && $('#tablePropietarios').textContent.includes('123-456789-0'));
+  check('cuenta del propietario', $('#tablePropietarios').textContent.includes('123-456789-0'));
+  // La comisión del abogado se define en el edificio
+  $('.nav-item[data-view="edificios"]').click(); await wait();
+  $('#tableEdificios [data-act="editar-edificio"]').click(); await wait();
+  set('mf-comisionTipo', 'porcentaje');
+  set('mf-comisionValor', '10');
+  await submit();
+  check('comisión del abogado en el edificio', $('#tableEdificios').textContent.includes('Comisión: 10% de lo cobrado'));
+  $('.nav-item[data-view="propietarios"]').click(); await wait();
   $('[data-view="propietarios"] [data-new="propietario"]').click(); await wait();
   set('mf-nombre', 'Pedro Dueño');
-  set('mf-comisionTipo', 'ninguna');
   // Propietario empresa: RNC (el de la DGII, válido) se acepta y se formatea
   set('mf-documento', '401506254');
   check('RNC válido reconocido', $('#docchk-documento').textContent.includes('✓ RNC válido (4-01-50625-4)'));
@@ -327,6 +334,8 @@
   $('.nav-item[data-view="unidades"]').click(); await wait();
   [...document.querySelectorAll('#tableUnidades tr')].find(tr => tr.textContent.includes('· 101') || tr.querySelector('.cell-main') && tr.querySelector('.cell-main').textContent === '101').querySelector('[data-act="editar-unidad"]').click(); await wait();
   set('mf-propietarioId', [...$('#mf-propietarioId').options].find(o => o.textContent === 'Pedro Dueño').value);
+  // y no lleva comisión: la suya reemplaza la del edificio
+  set('mf-comisionTipo', 'ninguna');
   await submit();
   $('.nav-item[data-view="propietarios"]').click(); await wait();
   check('apartamento suelto cuenta para su propietario', [...document.querySelectorAll('#tablePropietarios tr')].find(tr => tr.textContent.includes('Pedro Dueño')).textContent.includes('1 apartamento'));
@@ -341,13 +350,49 @@
   const filaPedro = () => [...document.querySelectorAll('#liqTabla tbody tr')].find(tr => tr.textContent.includes('Pedro Dueño'));
   check('María: cobrado 35,000, gastos 3,500, comisión 3,500, neto 28,000', filaMaria() && ['35,000.00', '3,500.00', '28,000.00'].every(s => filaMaria().textContent.includes(s)));
   check('Pedro: gasto del 101 a su cargo', filaPedro() && filaPedro().textContent.includes('8,000.00') && filaPedro().textContent.includes('A cargo del propietario'));
-  check('comisiones del despacho', $('#liqStats').textContent.includes('3,500.00'));
+  check('tu comisión', $('#liqStats').textContent.includes('Tu comisión') && $('#liqStats').textContent.includes('3,500.00'));
+  check('la fila es del edificio, con desglose por apartamento', filaMaria().textContent.includes('Residencial Las Palmas') && !!filaMaria().querySelector('.liq-desglose li') &&
+    filaMaria().querySelector('.liq-desglose').textContent.includes('10% de lo cobrado'));
+  // Descontar gastos se configura por edificio
+  $('.nav-item[data-view="configuracion"]').click(); await wait(300);
+  const chkGastos = document.querySelector('[data-cfg-gastos]');
+  check('opción de descontar gastos por edificio en Configuración', !!chkGastos && chkGastos.checked && chkGastos.closest('label').textContent.includes('Residencial Las Palmas'));
+  chkGastos.checked = false; chkGastos.dispatchEvent(new Event('change', { bubbles:true })); await wait(300);
+  $('.nav-item[data-view="liquidaciones"]').click(); await wait();
+  check('sin descontar gastos: neto 31,500 y Pedro sin cargo', filaMaria().textContent.includes('No se descuentan') && filaMaria().textContent.includes('31,500.00') && !filaPedro());
+  $('.nav-item[data-view="configuracion"]').click(); await wait(300);
+  const chkGastos2 = document.querySelector('[data-cfg-gastos]');
+  check('la opción queda guardada', !chkGastos2.checked);
+  chkGastos2.checked = true; chkGastos2.dispatchEvent(new Event('change', { bubbles:true })); await wait(300);
+  $('.nav-item[data-view="liquidaciones"]').click(); await wait();
   filaMaria().querySelector('[data-act="estado-cuenta"]').click(); await wait(400);
   filaMaria().querySelector('[data-act="registrar-liquidacion"]').click(); await wait();
   check('transferencia propone el neto', $('#mf-monto').value === '28000' && $('#mgmtFormSub').textContent.includes('123-456789-0'));
   set('mf-referencia', 'TRF-777');
   await submit();
-  check('liquidación registrada', filaMaria().textContent.includes('Transferido'));
+  check('liquidación registrada', filaMaria().textContent.includes('Liquidado'));
+  // "Todo": todas las liquidaciones de todos los meses, con su mes
+  const mesLiq = $('#liqMes').value;
+  const filasDelMes = document.querySelectorAll('#liqTabla tbody tr').length;
+  document.querySelector('[data-liq-modo="todo"]').click(); await wait();
+  const filasTodo = () => [...document.querySelectorAll('#liqTabla tbody tr')];
+  check('modo Todo: lista con columna Mes y sin selector de mes', $('#liqMesControles').hidden && $('#btnEnvioEstados').hidden && $('#liqTitulo').textContent.startsWith('Todas las liquidaciones') &&
+    $('#liqTabla thead').textContent.startsWith('Mes') && filasTodo().length >= 2 && filasTodo().some(tr => tr.textContent.includes('María Gómez') && tr.textContent.includes('Liquidado')));
+  const mesesTodo = filasTodo().map(tr => tr.querySelector('.liq-mes').textContent);
+  check('incluye todas las del mes (y las de otros meses)', filasTodo().length >= filasDelMes && mesesTodo.length === filasTodo().length);
+  set('liqEstado', 'pendientes'); await wait();
+  check('filtro "Pendientes": quita las registradas', filasTodo().length > 0 && filasTodo().every(tr => !tr.textContent.includes('Liquidado')));
+  // Imprimir y registrar funcionan desde Todo (la fila sabe su mes)
+  const filaPendTodo = filasTodo().find(tr => tr.querySelector('[data-act="registrar-liquidacion"]'));
+  const mesFilaPend = filaPendTodo.querySelector('.liq-mes').textContent;
+  filaPendTodo.querySelector('[data-act="registrar-liquidacion"]').click(); await wait();
+  check('registrar desde Todo usa el mes de la fila', $('#mgmtFormSub').textContent.includes(mesFilaPend));
+  $('#mgmtFormCancel').click(); await wait();
+  set('liqEstado', 'registradas'); await wait();
+  check('filtro "Registradas"', filasTodo().length > 0 && filasTodo().every(tr => !!tr.querySelector('[data-act="anular-liquidacion"]')));
+  set('liqEstado', ''); await wait();
+  document.querySelector('[data-liq-modo="mes"]').click(); await wait();
+  check('vuelve a "Por mes" en el mismo mes', !$('#liqMesControles').hidden && $('#liqMes').value === mesLiq && !!filaMaria());
   // Un pago nuevo después de registrar: avisa la diferencia
   $('.nav-item[data-view="cobros"]').click(); await wait();
   $('#cobrosPrev').click(); $('#cobrosPrev').click(); await wait();
@@ -370,6 +415,7 @@
   $('.nav-item[data-view="unidades"]').click(); await wait();
   [...document.querySelectorAll('#tableUnidades tr')].find(tr => tr.querySelector('.cell-main') && tr.querySelector('.cell-main').textContent === '101').querySelector('[data-act="editar-unidad"]').click(); await wait();
   set('mf-propietarioId', '');
+  set('mf-comisionTipo', '');
   await submit();
   $('.nav-item[data-view="liquidaciones"]').click(); await wait();
   check('sin movimientos, el registro sigue visible y avisa la diferencia', !!filaPedro() && filaPedro().textContent.includes('Cobrado') && filaPedro().textContent.includes('Cambió') && !!filaPedro().querySelector('[data-act="anular-liquidacion"]'));
@@ -508,7 +554,7 @@
 
   // Versión de la app en la marca (en la prueba Electron informa la suya;
   // con "npm start" o instalada es la del package.json).
-  check('versión en la marca', /^v\d+\.\d+\.\d+$/.test($('#appVersion').textContent));
+  check('versión en la marca', /^R\d+\.\d+\.\d+$/.test($('#appVersion').textContent));
 
   // ---------- Pago de varios meses juntos ----------
   // Contrato original de Juan (25,000 al mes): enero a julio sin pagar.
@@ -882,8 +928,55 @@
   check('lista de recordatorios con todos los atrasados', $('#loteOverlay').classList.contains('show') && filasLote().length === Number($('[data-count="atrasados"]').textContent) && filasLote().length > 0);
   const filaWa = filasLote().find(f => !f.querySelector('[data-lote="wa"]').disabled);
   const nombreWa = filaWa.querySelector('strong').textContent;
-  filaWa.querySelector('[data-lote="wa"]').click(); await wait(300);
-  check('enviar por WhatsApp lo marca como enviado', filasLote().find(f => f.querySelector('strong').textContent === nombreWa).textContent.includes('Enviado por WhatsApp'));
+  const filaAtrasado = () => filasLote().find(f => f.querySelector('strong').textContent === nombreWa);
+  const conWhatsApp = filasLote().filter(f => !f.querySelector('[data-lote="wa"]').disabled).length;
+
+  // Enviar a todos sin correo configurado: lo avisa y guía los WhatsApp uno a uno
+  $('#loteTodos').click(); await wait(400);
+  check('sin correo configurado: empieza el WhatsApp guiado', !$('#loteGuia').hidden && $('#loteGuiaPaso').textContent === 'WhatsApp 1 de ' + conWhatsApp &&
+    filasLote().some(f => f.classList.contains('actual')) && $('#loteTodos').disabled);
+  for (let i = 0; i < conWhatsApp; i++) { $('#loteGuiaAbrir').click(); await wait(250); }
+  check('al abrir el último chat termina y lo resume', $('#loteGuia').hidden && $('#loteEstado').textContent.startsWith('Listo') &&
+    $('#loteEstado').textContent.includes(conWhatsApp + ' WhatsApp abierto') && filaAtrasado().textContent.includes('Enviado por WhatsApp ✓'));
+  filaAtrasado().querySelector('[data-lote="wa"]').click(); await wait(300);
+  check('el botón de WhatsApp de cada fila sigue funcionando', filaAtrasado().textContent.includes('Enviado por WhatsApp'));
+  $('#loteClose').click(); await wait();
+
+  // Se le añade correo al inquilino
+  $('.nav-item[data-view="inquilinos"]').click(); await wait();
+  [...document.querySelectorAll('#tableInquilinos [data-act="ver-inquilino"]')].find(b => b.textContent === nombreWa).click(); await wait();
+  $('#tenantDetailEdit').click(); await wait();
+  set('mf-email', 'inquilino@ejemplo.com');
+  await submit();
+  if ($('#tenantDetailOverlay').classList.contains('show')) { $('#tenantDetailClose').click(); await wait(); }
+
+  // Configurar el correo de envío (servidor simulado en run.js)
+  $('.nav-item[data-view="configuracion"]').click(); await wait(300);
+  check('Configuración: correo sin configurar', $('#cfgCorreo').textContent.startsWith('Sin configurar'));
+  document.querySelector('.cfg-row [data-correo-open]').click(); await wait(300);
+  check('ventana del correo: Gmail por defecto y su ayuda', $('#correoOverlay').classList.contains('show') && $('#correoProveedor').value === 'gmail' && $('#correoServidor').hidden && !$('#correoAyudaGmail').hidden && $('#correoProbar').disabled);
+  set('correoUsuario', 'despacho@gmail.com');
+  set('correoPass', 'mala mala');
+  $('#correoGuardar').click(); await wait(300);
+  $('#correoProbar').click(); await wait(400);
+  check('contraseña rechazada: explica la contraseña de aplicación', $('#correoPrueba').textContent.includes('contraseña de aplicación'));
+  set('correoPass', 'abcd efgh ijkl mnop');
+  $('#correoGuardar').click(); await wait(300);
+  $('#correoProbar').click(); await wait(400);
+  check('correo configurado y probado', $('#correoEstado').textContent === 'Configurado: despacho@gmail.com' && $('#correoPrueba').textContent.startsWith('Funciona') && $('#correoPass').value === '');
+  set('correoProveedor', 'otro'); $('#correoProveedor').dispatchEvent(new Event('change')); await wait();
+  check('"Otro" pide servidor y puerto', !$('#correoServidor').hidden && $('#correoAyudaGmail').hidden);
+  $('#correoCerrar').click(); await wait(300);
+  check('Configuración: correo activado', $('#cfgCorreo').textContent.includes('despacho@gmail.com'));
+
+  // Enviar a todos con correo: se envía solo, sin repetir el WhatsApp
+  $('.nav-item[data-view="cobros"]').click(); await wait();
+  $('#btnLote').click(); await wait();
+  $('#loteTodos').click(); await wait(800);
+  check('Enviar a todos: correo automático, sin volver a abrir WhatsApp', $('#loteGuia').hidden && /\d+ correos? enviados?/.test($('#loteEstado').textContent) &&
+    filaAtrasado().textContent.includes('Enviado por correo y WhatsApp ✓'));
+  $('#loteTodos').click(); await wait(400);
+  check('una segunda vez no repite envíos', $('#loteGuia').hidden && !$('#loteEstado').textContent.includes('enviado'));
   $('#loteClose').click(); await wait();
 
   // ---------- Aumento anual ----------
@@ -988,7 +1081,7 @@
   const filasEnvio = () => [...document.querySelectorAll('#envioLista .lote-fila')];
   check('lista de estados de cuenta del mes, uno por propietario', $('#envioOverlay').classList.contains('show') && filasEnvio().length === filasLiq && filasLiq > 0);
   filasEnvio()[0].querySelector('[data-envio="pdf"]').click(); await wait(2500);
-  check('estado de cuenta en PDF', noticeText() !== null && noticeText().includes('PDF guardado: Estado_de_cuenta_'));
+  check('estado de cuenta en PDF', noticeText() !== null && noticeText().includes('PDF guardado: Liquidacion_'));
   $('#noticeCancelBtn').click(); await wait();
   const conCanal = filasEnvio().find(f => !f.querySelector('[data-envio="wa"]').disabled || !f.querySelector('[data-envio="correo"]').disabled);
   if (conCanal) {
@@ -996,7 +1089,7 @@
     check('enviarlo lo marca como enviado', filasEnvio().some(f => f.classList.contains('enviado')));
   }
   $('#envioTodos').click(); await wait(2500);
-  check('todos los estados de cuenta en un PDF', noticeText() !== null && noticeText().includes('Estados_de_cuenta_'));
+  check('todas las liquidaciones en un PDF', noticeText() !== null && noticeText().includes('Liquidaciones_'));
   $('#noticeCancelBtn').click(); await wait();
   $('#envioClose').click(); await wait();
 
@@ -1072,7 +1165,189 @@
   check('Ctrl+S guarda una versión .doc', Number($('#libCountDocs').textContent || 0) === docsAntes + 1);
   $('#btnPdf').click(); await wait(2500);
   check('botón PDF del redactor', $('#saveStatus').textContent.startsWith('PDF guardado:'));
+  check('lo que sigue al salto de página empieza en la hoja 2', /· 2 páginas/.test($('#rdStats').textContent) && !!ed.querySelector('.salto-pagina ~ .pag-salto'));
+
+  // Hojas como en Word: ningún párrafo cruza el final de una hoja
+  window.rcEditor.loadHtml(Array.from({ length: 70 }, (_, i) => '<p>Cláusula ' + (i + 1) + '. ' + 'El inquilino se obliga a cumplir lo pactado en este contrato. '.repeat(1 + i % 4) + '</p>').join('') + '<p></p><p><br></p><p>Fin.</p>');
+  await wait(400);
+  const hojas = () => {
+    const alto = 11 * 96, margen = Number($('#margenSelect').value) * 96 / 2.54, paso = alto + 24;
+    const escala = ed.getBoundingClientRect().height / ed.offsetHeight, origen = ed.getBoundingClientRect().top;
+    return [...ed.querySelectorAll('p')].every(p => {
+      const r = p.getBoundingClientRect(), top = (r.top - origen) / escala + (parseFloat(getComputedStyle(p).paddingTop) || 0), bajo = (r.bottom - origen) / escala;
+      const n = Math.floor(top / paso);
+      return top >= n * paso + margen - 1 && bajo <= n * paso + alto - margen + 1;
+    });
+  };
+  check('documento largo: varias hojas y cada párrafo dentro del área de texto', parseInt($('#rdStats').textContent.split('·')[1], 10) >= 3 && hojas());
+  check('el alto del editor es un número exacto de hojas', Math.abs((ed.offsetHeight + 24) / (11 * 96 + 24) - Math.round((ed.offsetHeight + 24) / (11 * 96 + 24))) < 0.01);
+  check('el paginado no se guarda en el documento', !window.rcEditor.getHtml().includes('pag-salto') && !window.rcEditor.getHtml().includes('--pag'));
+  const paginasAntes = parseInt($('#rdStats').textContent.split('·')[1], 10);
+  set('margenSelect', '3.18'); $('#margenSelect').dispatchEvent(new Event('change')); await wait(200);
+  check('márgenes amplios: la hoja los usa y el texto ocupa más hojas', ed.style.getPropertyValue('--margen') === '3.18cm' && parseInt($('#rdStats').textContent.split('·')[1], 10) > paginasAntes && hojas());
+  // El PDF debe tener las mismas páginas que el editor (lo comprueba run.js por el nombre)
+  const baseAntes = $('#baseName').value;
+  $('#baseName').value = 'paginas_' + parseInt($('#rdStats').textContent.split('·')[1], 10);
+  $('#btnPdf').click(); await wait(2500);
+  $('#baseName').value = baseAntes;
+  set('margenSelect', '2'); $('#margenSelect').dispatchEvent(new Event('change')); await wait(200);
+
+  // Interlineado y espacio entre párrafos
+  const p1 = ed.querySelector('p');
+  const r1 = document.createRange(); r1.selectNodeContents(p1); ed.focus(); window.getSelection().removeAllRanges(); window.getSelection().addRange(r1);
+  $('#btnInterlineado').click(); await wait();
+  check('menú de interlineado abierto, con el actual marcado', !$('#menuInterlineado').hidden && $('#menuInterlineado [data-interlineado].active') === null);
+  $('#menuInterlineado [data-interlineado="1"]').click(); await wait();
+  check('interlineado sencillo en el párrafo elegido', p1.style.lineHeight === '1' && ed.querySelectorAll('p')[1].style.lineHeight === '' && $('#menuInterlineado [data-interlineado="1"]').classList.contains('active'));
+  $('#menuInterlineado [data-interlineado-paso="0.1"]').click(); await wait();
+  check('"Separar líneas" amplía poco a poco', p1.style.lineHeight === '1.1');
+  $('#menuInterlineado [data-parrafo="0"]').click(); await wait();
+  check('sin espacio después del párrafo', p1.style.marginBottom === '0pt');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key:'2', ctrlKey:true, bubbles:true })); await wait();
+  check('Ctrl+2: interlineado doble', p1.style.lineHeight === '2');
+  $('#interlineadoTodo').checked = true;
+  $('#menuInterlineado [data-interlineado="1.15"]').click(); await wait();
+  check('aplicar a todo el documento', [...ed.querySelectorAll('p')].every(p => p.style.lineHeight === '1.15'));
+  const parrafosAntes = ed.querySelectorAll('p').length;
+  $('#menuInterlineado [data-accion="quitar-vacias"]').click(); await wait(300);
+  check('quitar líneas vacías', ed.querySelectorAll('p').length === parrafosAntes - 2 && $('#interlineadoNota').textContent.includes('2 líneas vacías') && hojas());
+  $('#interlineadoTodo').checked = false;
+  document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles:true })); await wait();
+  check('el menú se cierra al hacer clic fuera', $('#menuInterlineado').hidden);
+
+  // Los campos toman el formato de la selección (el navegador los salta)
+  window.rcEditor.loadHtml('<p>Arrendatario: <span class="campo" id="cf1" contenteditable="false" data-label="Nombre" data-value="">[Nombre]</span>, mayor de edad.</p>');
+  await wait(200);
+  const selTodo = () => { const r = document.createRange(); r.selectNodeContents(ed.querySelector('p')); ed.focus(); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); };
+  const campoF = () => ed.querySelector('.campo');
+  const textoF = () => getComputedStyle(ed.querySelector('p font') || ed.querySelector('p'));
+  selTodo(); await wait();
+  set('formatFontSelect', 'Arial'); $('#formatFontSelect').dispatchEvent(new Event('change')); await wait();
+  selTodo(); await wait();
+  set('formatSizeSelect', '5'); $('#formatSizeSelect').dispatchEvent(new Event('change')); await wait();
+  check('fuente y tamaño también en el campo, iguales al texto', getComputedStyle(campoF()).fontFamily === textoF().fontFamily && getComputedStyle(campoF()).fontSize === textoF().fontSize && /Arial/.test(getComputedStyle(campoF()).fontFamily));
+  selTodo(); await wait();
+  $('[data-command="bold"]').click(); await wait();
+  check('negrita también en el campo', getComputedStyle(campoF()).fontWeight === '700');
+  selTodo(); await wait();
+  $('[data-command="bold"]').click(); await wait();
+  check('y se puede quitar', getComputedStyle(campoF()).fontWeight !== '700');
+  campoF().setAttribute('data-value', 'Ana Rodríguez\nPasaporte 123');
+  check('el formato se guarda con el documento', /font-family:[^;"]*Arial/.test(window.rcEditor.getHtml()) && /font-size:\s*x-large/.test(window.rcEditor.getHtml()));
+  window.rcEditor.fillFields(l => l === 'Nombre' ? 'Ana Rodríguez' : null);
+  check('al rellenar el campo conserva su formato', campoF().textContent === 'Ana Rodríguez' && /Arial/.test(getComputedStyle(campoF()).fontFamily));
+  selTodo(); await wait();
+  $('[data-command="removeFormat"]').click(); await wait();
+  check('"Quitar formato" también lo quita del campo', !campoF().getAttribute('style'));
+  // Un campo nuevo dentro de texto con otra fuente toma esa fuente
+  window.rcEditor.loadHtml('<p><font face="Arial" size="5">Firma de </font></p>');
+  await wait(200);
+  const fontF = ed.querySelector('font');
+  const rCur = document.createRange(); rCur.setStart(fontF.firstChild, fontF.firstChild.length); rCur.collapse(true);
+  ed.focus(); window.getSelection().removeAllRanges(); window.getSelection().addRange(rCur); await wait();
+  $('#btnInsertField').click(); await wait();
+  $('#fieldLabel').value = 'Ciudad'; $('#fieldValue').value = 'Santo Domingo';
+  $('#fieldSave').click(); await wait();
+  check('campo nuevo con la fuente y el tamaño del texto', getComputedStyle(campoF()).fontFamily === getComputedStyle(fontF).fontFamily && getComputedStyle(campoF()).fontSize === getComputedStyle(fontF).fontSize);
   document.querySelector('[data-lib-tab="documentos"]').click(); await wait();
+
+  // ---------- Ayuda: recorrido interactivo ----------
+  check('botón de ayuda en la barra superior', !!$('#btnAyuda') && $('#btnAyuda').offsetParent !== null);
+  $('#btnAyuda').click(); await wait();
+  const tourMenu = document.querySelector('.tour-menu');
+  check('menú de ayuda: completo, esta pantalla y por sección (sin Configuración)', !tourMenu.hidden && !!tourMenu.querySelector('[data-tour="todo"]') &&
+    tourMenu.querySelectorAll('.tour-menu-grid button').length === window.rcTour.secciones.length && !window.rcTour.secciones.includes('configuracion') && !/Configuración/.test(tourMenu.textContent));
+  tourMenu.querySelector('[data-tour="todo"]').click(); await wait();
+  const capaTour = document.querySelector('.tour-capa');
+  const cuentaTour = () => capaTour.querySelector('.tour-cuenta').textContent;
+  const totalTour = parseInt(cuentaTour().split(' de ')[1], 10);
+  check('el recorrido empieza y cierra el menú', !capaTour.hidden && tourMenu.hidden && cuentaTour().startsWith('1 de ') && totalTour > 30);
+  const vistasTour = new Set(), sinFoco = [];
+  for (let i = 0; i < totalTour; i++) {
+    vistasTour.add(document.body.dataset.activeView);
+    if (capaTour.querySelector('.tour-foco').classList.contains('sin-foco')) sinFoco.push(capaTour.querySelector('.tour-titulo').textContent + ' (' + document.body.dataset.activeView + ')');
+    if (i < totalTour - 1) { document.dispatchEvent(new KeyboardEvent('keydown', { key:'ArrowRight', bubbles:true })); await wait(60); }
+  }
+  check('recorre todas las pantallas menos Configuración', vistasTour.size === 15 && !vistasTour.has('configuracion'));
+  check('cada paso resalta su elemento' + (sinFoco.length ? ' (sin foco: ' + sinFoco.join(', ') + ')' : ''), !sinFoco.length);
+  const tarjetaTour = capaTour.querySelector('.tour-card').getBoundingClientRect();
+  check('la tarjeta queda dentro de la ventana', tarjetaTour.left >= 0 && tarjetaTour.top >= 0 && tarjetaTour.right <= window.innerWidth && tarjetaTour.bottom <= window.innerHeight);
+  check('el último paso dice "Terminar"', capaTour.querySelector('[data-tour-acc="siguiente"]').textContent === 'Terminar');
+  capaTour.querySelector('[data-tour-acc="siguiente"]').click(); await wait();
+  check('al terminar se cierra y no vuelve a llamar la atención', capaTour.hidden && !$('#btnAyuda').classList.contains('pulso') && localStorage.getItem('renthouse.tourVisto') === '1');
+  $('.nav-item[data-view="cobros"]').click(); await wait();
+  $('#btnAyuda').click(); await wait();
+  tourMenu.querySelector('[data-tour="aqui"]').click(); await wait();
+  check('"Esta pantalla" recorre solo Cobros', !capaTour.hidden && capaTour.querySelector('.tour-seccion').textContent === 'Cobros' && cuentaTour() === '1 de 4');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', bubbles:true })); await wait();
+  check('Esc sale del recorrido', capaTour.hidden);
+  check('pantallas sin párrafos de explicación', [...document.querySelectorAll('.view:not([data-view="configuracion"]) .mgmt-head p')].length === 0);
+
+  // ---------- Licencia: plan "solo redactor" y "completo" ----------
+  const gateLic = $('#licenseGate');
+  const fetchReal = window.fetch;
+  let respuestaLic = null;
+  window.fetch = async (url, opts) => {
+    if (!String(url).includes('workers.dev')) return fetchReal(url, opts);
+    if (respuestaLic === 'sin-red') throw new TypeError('Failed to fetch');
+    return { json: async () => respuestaLic };
+  };
+  localStorage.setItem('rc_device_id', 'equipo-prueba');
+  const activarLic = async (clave, resp) => {
+    respuestaLic = resp;
+    gateLic.classList.remove('gate-hidden');
+    $('#licenseKeyInput').value = clave;
+    $('#licenseActivateBtn').click(); await wait(500);
+  };
+  const navVisibles = () => [...document.querySelectorAll('.side-nav .nav-item[data-view]')].filter(b => b.offsetParent !== null).map(b => b.dataset.view);
+  const estadoLic = () => $('#licenseGateStatus').textContent;
+
+  // El plan sale del token firmado, no de lo que diga la respuesta
+  await activarLic('CLAVE-RED', { ok:true, plan:'completo', token: window.__TOKENS.redactor });
+  check('licencia "redactor": abre solo el redactor', gateLic.classList.contains('gate-hidden') && document.body.dataset.plan === 'redactor' &&
+    document.body.dataset.activeView === 'redactor' && navVisibles().join(',') === 'redactor,configuracion' && $('#btnBuscar').offsetParent === null);
+  $('.nav-item[data-view="cobros"]').click(); await wait();
+  check('no se puede entrar a la gestión', document.body.dataset.activeView === 'redactor');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key:'k', ctrlKey:true, bubbles:true })); await wait();
+  check('ni con la búsqueda (Ctrl+K)', !$('#buscarOverlay').classList.contains('show'));
+  $('.nav-item[data-view="configuracion"]').click(); await wait(300);
+  check('Configuración sin lo de gestión, con el papel', [...document.querySelectorAll('.solo-completo')].every(el => el.offsetParent === null) &&
+    document.querySelector('[data-ajuste="papel"]').offsetParent !== null && document.querySelector('[data-ajuste="moneda"]').offsetParent === null &&
+    document.querySelector('[data-ajuste="tema"], .cfg-swatch').offsetParent !== null);
+  $('#btnAyuda').click(); await wait();
+  check('la ayuda ofrece solo el redactor', [...document.querySelectorAll('.tour-menu-grid [data-tour]')].filter(b => !b.hidden).map(b => b.dataset.tour).join(',') === 'general,redactor');
+  document.querySelector('.tour-menu [data-tour="todo"]').click(); await wait();
+  check('recorrido del plan redactor: 9 pasos, sin búsqueda', document.querySelector('.tour-cuenta').textContent === '1 de 9');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', bubbles:true })); await wait();
+
+  // Tokens que no valen
+  const [cuerpoTok, firmaTok] = window.__TOKENS.redactor.split('.');
+  const datosTok = JSON.parse(atob(cuerpoTok.replace(/-/g, '+').replace(/_/g, '/')));
+  const tokFalso = btoa(JSON.stringify(Object.assign(datosTok, { p:'completo' }))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') + '.' + firmaTok;
+  await activarLic('CLAVE-RED', { ok:true, plan:'completo', token: tokFalso });
+  check('token manipulado: no abre', !gateLic.classList.contains('gate-hidden') && estadoLic().includes('firma válida'));
+  await activarLic('CLAVE-RED', { ok:true, token: window.__TOKENS.ajeno });
+  check('token de otro equipo: no abre', !gateLic.classList.contains('gate-hidden') && estadoLic().includes('firma válida'));
+  await activarLic('CLAVE-RED', { ok:true, status:'verified' });
+  check('servidor sin firma (Worker sin actualizar): no abre', !gateLic.classList.contains('gate-hidden'));
+  await activarLic('CLAVE-RED', { ok:false, reason:'update_required' });
+  check('licencia que pide actualizar el programa', estadoLic().includes('última versión'));
+
+  // Sin internet: vale el último token firmado de las últimas 12 horas
+  await activarLic('CLAVE-RED', { ok:true, token: window.__TOKENS.redactor });
+  await activarLic('CLAVE-RED', 'sin-red');
+  check('sin conexión, con token reciente: abre con su plan', gateLic.classList.contains('gate-hidden') && document.body.dataset.plan === 'redactor' && estadoLic().startsWith('Sin conexión'));
+  localStorage.setItem('rc_license_token', window.__TOKENS.viejo);
+  await activarLic('CLAVE-RED', 'sin-red');
+  check('sin conexión, con token de más de 12 horas: no abre', !gateLic.classList.contains('gate-hidden') && estadoLic().startsWith('No se pudo conectar'));
+
+  // Licencia completa: vuelve todo
+  await activarLic('CLAVE-COMP', { ok:true, plan:'completo', token: window.__TOKENS.completo });
+  check('licencia "completa": todo el menú', gateLic.classList.contains('gate-hidden') && document.body.dataset.plan === 'completo' && navVisibles().length === 16 && $('#btnBuscar').offsetParent !== null);
+  $('.nav-item[data-view="cobros"]').click(); await wait();
+  check('y se puede entrar a la gestión', document.body.dataset.activeView === 'cobros');
+  window.fetch = fetchReal;
+  ['rc_license_key', 'rc_license_token'].forEach(k => localStorage.removeItem(k));
 
   // Vista estrecha
   check('sin scroll horizontal', document.documentElement.scrollWidth <= window.innerWidth);

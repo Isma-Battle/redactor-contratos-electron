@@ -3,6 +3,7 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const { buildXlsx } = require('./xlsx-writer');
 
 let mainWindow = null;
@@ -116,15 +117,16 @@ ipcMain.handle('rc-print', async (event, payload) => {
   const bodyHtml = opts.bodyHtml || '';
   const pageSize = opts.pageSize || 'A4';
   const landscape = !!opts.landscape;
+  const margen = opts.margen;
   const rawTitle = (opts.title || 'contrato').toString();
 
-  writeLog('rc-print: generando documento para el navegador. Opciones:', { pageSize, landscape, title: rawTitle });
+  writeLog('rc-print: generando documento para el navegador. Opciones:', { pageSize, landscape, margen, title: rawTitle });
 
   if (!bodyHtml.trim()) {
     return { success: false, error: 'sin-contenido' };
   }
 
-  const html = documentoImprimible({ bodyHtml, pageSize, landscape, title: rawTitle, aviso: true });
+  const html = documentoImprimible({ bodyHtml, pageSize, landscape, margen, title: rawTitle, aviso: true });
 
   try {
     // Borra el documento de impresión anterior antes de crear uno nuevo.
@@ -152,29 +154,40 @@ ipcMain.handle('rc-print', async (event, payload) => {
 });
 
 // Documento HTML completo para imprimir o convertir a PDF: página del
-// tamaño elegido (@page) con márgenes de 2 cm y la tipografía del redactor.
-// "aviso" añade la nota de Ctrl+P, que solo tiene sentido en el navegador.
-function documentoImprimible({ bodyHtml, pageSize, landscape, title, aviso }) {
+// tamaño elegido (@page) con los márgenes del redactor (2 cm por defecto)
+// y la misma tipografía y espaciado que la hoja del editor, para que cada
+// página salga como se ve allí (los párrafos no se parten entre páginas,
+// igual que en el editor). En pantalla, el navegador lo muestra como una
+// hoja de ese tamaño. "aviso" añade la nota de Ctrl+P, que solo tiene
+// sentido en el navegador.
+const PAPELES = { Letter: ['8.5in', '11in'], A4: ['210mm', '297mm'], Legal: ['8.5in', '14in'], A3: ['297mm', '420mm'], A5: ['148mm', '210mm'], Tabloid: ['11in', '17in'] };
+function documentoImprimible({ bodyHtml, pageSize, landscape, margen, title, aviso }) {
   const pageSizeCss = landscape ? `${pageSize} landscape` : pageSize;
+  const m = /^\d+(\.\d+)?(cm|mm|in)$/.test(String(margen || '')) ? margen : '2cm';
+  const [pw, ph] = PAPELES[pageSize] || PAPELES.Letter;
+  const [ancho, alto] = landscape ? [ph, pw] : [pw, ph];
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <title>${title}</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <style>
-  @page { size: ${pageSizeCss}; margin: 2cm; }
+  @page { size: ${pageSizeCss}; margin: ${m}; }
   html,body{ margin:0; padding:0; }
   body{
     font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     font-size:12pt;
     line-height:1.6;
     color:#1a1a1a;
-    padding: 24px 32px;
     background:#fff;
-    max-width: 900px;
-    margin: 0 auto;
+    position:relative;
   }
   p{ margin:0 0 12pt 0; }
+  h1{ font-size:20pt; line-height:1.3; margin:0 0 12pt; }
+  h2{ font-size:16pt; line-height:1.3; margin:14pt 0 8pt; }
+  h3{ font-size:13pt; line-height:1.3; margin:12pt 0 6pt; }
+  p, li, h1, h2, h3, blockquote, tr{ break-inside:avoid; }
   img{ max-width:100%; }
   .print-hint{
     font-family: Arial, sans-serif;
@@ -184,16 +197,31 @@ function documentoImprimible({ bodyHtml, pageSize, landscape, title, aviso }) {
     border: 1px solid #f0d98c;
     border-radius: 6px;
     padding: 10px 14px;
-    margin-bottom: 18px;
+    margin: 18px auto;
+    max-width: ${ancho};
+    box-sizing: border-box;
+  }
+  @media screen{
+    html{ background:#e3e6ec; }
+    body{
+      box-sizing:border-box;
+      width:${ancho};
+      min-height:${alto};
+      border:${m} solid #fff; /* borde y no padding: las imágenes libres cuentan desde el área de texto, como al imprimir */
+      margin:0 auto 32px;
+      box-shadow:0 4px 18px rgba(0,0,0,.18);
+    }
+    .print-hint{ position:absolute; left:0; right:0; top:-64px; }
+    body.con-aviso{ margin-top:84px; }
   }
   @media print{
     .print-hint{ display:none; }
-    body{ padding: 0; max-width:none; }
+    html{ background:#fff; }
   }
 </style>
 </head>
-<body>
-${aviso ? `<div class="print-hint">Para imprimir, usa Ctrl+P (o el menú del navegador). El tamaño de papel "${pageSize}"${landscape ? ' horizontal' : ''} ya viene preconfigurado; puedes cambiarlo también en el propio diálogo de impresión del navegador.</div>` : ''}
+<body${aviso ? ' class="con-aviso"' : ''}>
+${aviso ? `<div class="print-hint">Ctrl+P para imprimir. Papel "${pageSize}"${landscape ? ' horizontal' : ''} y márgenes ya configurados.</div>` : ''}
 ${bodyHtml}
 </body>
 </html>`;
@@ -555,9 +583,12 @@ ipcMain.handle('rc-pdf', async (event, payload) => {
     });
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
     tmp = path.join(os.tmpdir(), 'rc-pdf-' + Date.now() + '.html');
-    fs.writeFileSync(tmp, documentoImprimible({ bodyHtml: opts.bodyHtml, pageSize: opts.pageSize || 'Letter', landscape: !!opts.landscape, title, aviso: false }), 'utf8');
+    fs.writeFileSync(tmp, documentoImprimible({ bodyHtml: opts.bodyHtml, pageSize: opts.pageSize || 'Letter', landscape: !!opts.landscape, margen: opts.margen, title, aviso: false }), 'utf8');
     win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
     await win.loadFile(tmp);
+    // La fuente del documento llega por internet: un momento para que se
+    // aplique (sin conexión se usa Georgia, como en el editor).
+    await new Promise(r => setTimeout(r, 600));
     const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true });
     fs.mkdirSync(path.dirname(result.filePath), { recursive: true });
     fs.writeFileSync(result.filePath, pdf);
@@ -736,6 +767,168 @@ ipcMain.handle('rc-didit-verify', async (event, cedula) => {
   return Object.assign({ ok: true }, resultado);
 });
 
+// ---------------------------------------------------------------
+// Correo de envío (SMTP) para los recordatorios de pago: la app envía
+// cada recordatorio por su cuenta, sin abrir el programa de correo.
+// - La contraseña (en Gmail, una "contraseña de aplicación") se guarda
+//   cifrada con safeStorage, como la clave de Didit.
+// - Un lote se envía con una sola conexión y avisa al renderer de cada
+//   envío ('rc-correo-progreso') para mostrar el avance.
+// ---------------------------------------------------------------
+const nodemailer = require('nodemailer');
+
+function correoConfig() {
+  const c = readConfig().correo;
+  if (!c || !c.host || !c.user || !c.pass) return null;
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    return { host: c.host, port: Number(c.port) || 465, user: c.user, nombre: c.nombre || '', pass: safeStorage.decryptString(Buffer.from(c.pass, 'base64')) };
+  } catch (err) {
+    return null;
+  }
+}
+
+function transporteCorreo(c) {
+  return nodemailer.createTransport({
+    host: c.host, port: c.port, secure: c.port === 465,
+    auth: { user: c.user, pass: c.pass },
+    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000
+  });
+}
+
+// Mensaje claro para los errores de SMTP más comunes.
+function errorCorreo(err) {
+  writeLog('Correo:', err && (err.code || ''), err && err.message);
+  const code = err && err.code;
+  if (code === 'EAUTH') return 'El servidor no aceptó el usuario o la contraseña. En Gmail usa una contraseña de aplicación, no la de tu cuenta.';
+  if (code === 'EDNS' || code === 'ECONNECTION' || code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNREFUSED') return 'No se pudo conectar con el servidor de correo. Revisa tu conexión a internet, el servidor y el puerto.';
+  if (code === 'EENVELOPE') return 'El servidor rechazó la dirección de destino.';
+  return 'No se pudo enviar: ' + ((err && err.message) || 'error desconocido') + '.';
+}
+
+function remitente(c) {
+  return c.nombre ? { name: c.nombre, address: c.user } : c.user;
+}
+
+ipcMain.handle('rc-correo-status', () => {
+  const guardado = readConfig().correo || {};
+  return { configured: !!correoConfig(), host: guardado.host || '', port: guardado.port || 465, user: guardado.user || '', nombre: guardado.nombre || '', cifradoDisponible: safeStorage.isEncryptionAvailable() };
+});
+
+// Guarda la cuenta; si no se escribe contraseña, se conserva la anterior.
+ipcMain.handle('rc-correo-set', (event, datos) => {
+  const d = datos || {};
+  const host = String(d.host || '').trim().toLowerCase();
+  const port = Number(d.port);
+  const user = String(d.user || '').trim();
+  const pass = String(d.pass || '').replace(/\s+/g, ''); // Gmail la muestra en grupos de 4 con espacios
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host)) return { ok: false, error: 'Revisa el servidor de correo (p. ej. smtp.gmail.com).' };
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, error: 'El puerto no es válido.' };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(user)) return { ok: false, error: 'Escribe tu dirección de correo completa.' };
+  const anterior = readConfig().correo || {};
+  if (!pass && !anterior.pass) return { ok: false, error: 'Falta la contraseña.' };
+  if (!safeStorage.isEncryptionAvailable()) return { ok: false, error: 'Este equipo no permite guardar la contraseña cifrada.' };
+  const cfg = readConfig();
+  cfg.correo = { host, port, user, nombre: String(d.nombre || '').trim().slice(0, 80), pass: pass ? safeStorage.encryptString(pass).toString('base64') : anterior.pass };
+  writeConfig(cfg);
+  return { ok: true };
+});
+
+ipcMain.handle('rc-correo-remove', () => {
+  const cfg = readConfig();
+  delete cfg.correo;
+  writeConfig(cfg);
+  return { ok: true };
+});
+
+// Se envía un correo de prueba a la propia cuenta.
+ipcMain.handle('rc-correo-test', async () => {
+  const c = correoConfig();
+  if (!c) return { ok: false, error: 'sin-configurar' };
+  const t = transporteCorreo(c);
+  try {
+    await t.sendMail({ from: remitente(c), to: c.user, subject: 'Prueba de RentHouse', text: 'Si lees esto, los recordatorios de pago por correo funcionan.' });
+    return { ok: true, mensaje: 'Funciona: te enviamos un correo de prueba a ' + c.user + '.' };
+  } catch (err) {
+    return { ok: false, error: errorCorreo(err) };
+  } finally {
+    t.close();
+  }
+});
+
+// mensajes: [{ id, to, subject, text }] → [{ id, ok, error }]
+ipcMain.handle('rc-correo-enviar-lote', async (event, mensajes) => {
+  const c = correoConfig();
+  if (!c) return { ok: false, error: 'sin-configurar' };
+  const lista = (Array.isArray(mensajes) ? mensajes : []).slice(0, 500);
+  const t = transporteCorreo(c);
+  const resultados = [];
+  try {
+    for (let i = 0; i < lista.length; i++) {
+      const m = lista[i] || {};
+      let r;
+      if (!/^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$/.test(String(m.to || ''))) r = { id: m.id, ok: false, error: 'Dirección de correo no válida.' };
+      else {
+        try {
+          await t.sendMail({ from: remitente(c), replyTo: c.user, to: String(m.to), subject: String(m.subject || '').slice(0, 200), text: String(m.text || '') });
+          r = { id: m.id, ok: true };
+        } catch (err) {
+          r = { id: m.id, ok: false, error: errorCorreo(err) };
+          // Sin conexión o sin acceso fallarán todos: se corta el lote.
+          if (['EAUTH', 'EDNS', 'ECONNECTION', 'ETIMEDOUT', 'ECONNREFUSED'].includes(err && err.code)) {
+            resultados.push(r);
+            if (!event.sender.isDestroyed()) event.sender.send('rc-correo-progreso', { hecho: i + 1, total: lista.length, resultado: r });
+            return { ok: false, error: r.error, resultados };
+          }
+        }
+      }
+      resultados.push(r);
+      if (!event.sender.isDestroyed()) event.sender.send('rc-correo-progreso', { hecho: i + 1, total: lista.length, resultado: r });
+    }
+    writeLog('Correo: lote enviado,', resultados.filter(r => r.ok).length, 'de', lista.length);
+    return { ok: true, resultados };
+  } finally {
+    t.close();
+  }
+});
+
+// ---------------------------------------------------------------
+// Licencias: el servidor (servidor-licencias/worker.js) devuelve un
+// token { k: clave, d: equipo, p: plan, t: fecha } firmado con Ed25519.
+// Aquí se comprueba con la clave pública que viaja con la app, así nadie
+// puede cambiarse el plan editando lo guardado en su equipo. maxEdadMs
+// limita cuánto vale un token guardado cuando no hay internet.
+// ---------------------------------------------------------------
+const PLANES_LICENCIA = ['completo', 'redactor'];
+function clavePublicaLicencia() {
+  // Los tests usan su propia clave; la app instalada, siempre la suya.
+  if (!app.isPackaged && process.env.RC_LICENCIA_CLAVE_PUBLICA) return process.env.RC_LICENCIA_CLAVE_PUBLICA;
+  try { return fs.readFileSync(path.join(__dirname, 'licencia-publica.pem'), 'utf8'); } catch (err) { return null; }
+}
+
+ipcMain.handle('rc-licencia-verificar', (event, datos) => {
+  const d = datos || {};
+  const publica = clavePublicaLicencia();
+  if (!publica) return { ok: false, error: 'sin-clave-publica' };
+  try {
+    const [cuerpo, firma] = String(d.token || '').split('.');
+    if (!cuerpo || !firma) return { ok: false, error: 'token-invalido' };
+    const bytes = Buffer.from(cuerpo, 'base64url');
+    if (!crypto.verify(null, bytes, publica, Buffer.from(firma, 'base64url'))) return { ok: false, error: 'firma-invalida' };
+    const t = JSON.parse(bytes.toString('utf8'));
+    if (t.k !== d.licenseKey || t.d !== d.deviceId || !PLANES_LICENCIA.includes(t.p)) return { ok: false, error: 'token-ajeno' };
+    const edad = Date.now() - Number(t.t);
+    if (!(edad > -5 * 60 * 1000)) return { ok: false, error: 'token-futuro' };
+    if (d.maxEdadMs && edad > d.maxEdadMs) return { ok: false, error: 'token-caducado', edadMs: edad };
+    return { ok: true, plan: t.p, edadMs: edad };
+  } catch (err) {
+    writeLog('Licencia: token no válido:', err.message);
+    return { ok: false, error: 'token-invalido' };
+  }
+});
+
+ipcMain.on('rc-licencia-registro', (event, texto) => writeLog(String(texto).slice(0, 200)));
+
 ipcMain.on('rc-app-version', (event) => {
   event.returnValue = app.getVersion();
 });
@@ -785,7 +978,8 @@ function createWindow() {
     writeLog('MAINWINDOW VOLVIO A RESPONDER');
   });
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+    // Solo en desarrollo: en la app instalada abrirían la puerta a saltarse la licencia.
+    if (!app.isPackaged && input.control && input.shift && input.key.toLowerCase() === 'i') {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
   });

@@ -179,7 +179,7 @@
         const nombre = String(b.propietario || '').trim() || 'Propietario de ' + b.nombre;
         let p = db.propietarios.find(x => normalize(x.nombre) === normalize(nombre));
         if (!p) {
-          p = { id: uid('prp'), creado: new Date().toISOString(), nombre, documento: b.propietarioDocumento || '', comisionTipo: 'porcentaje', comisionValor: null };
+          p = { id: uid('prp'), creado: new Date().toISOString(), nombre, documento: b.propietarioDocumento || '' };
           db.propietarios.push(p);
         } else if (!p.documento && b.propietarioDocumento) {
           p.documento = b.propietarioDocumento;
@@ -189,6 +189,28 @@
       if ('propietario' in b || 'propietarioDocumento' in b) {
         delete b.propietario;
         delete b.propietarioDocumento;
+        changed = true;
+      }
+    });
+    // Antes la comisión se definía en el propietario; ahora es del abogado
+    // por edificio (y apartamento). Cada edificio hereda la de su dueño, y
+    // un apartamento con dueño propio, la de ese dueño.
+    const comisionDe = (p) => p && p.comisionTipo ? { comisionTipo: p.comisionTipo, comisionValor: p.comisionValor, comisionMoneda: p.comisionMoneda } : null;
+    db.edificios.forEach(b => {
+      if (b.comisionTipo) return;
+      const c = comisionDe(byId(db.propietarios, b.propietarioId));
+      if (c) { Object.assign(b, c); changed = true; }
+    });
+    db.unidades.forEach(u => {
+      if (u.comisionTipo || !u.propietarioId) return;
+      const b = byId(db.edificios, u.edificioId) || {};
+      if (u.propietarioId === b.propietarioId) return;
+      const c = comisionDe(byId(db.propietarios, u.propietarioId));
+      if (c) { Object.assign(u, c); changed = true; }
+    });
+    db.propietarios.forEach(p => {
+      if ('comisionTipo' in p || 'comisionValor' in p || 'comisionMoneda' in p) {
+        delete p.comisionTipo; delete p.comisionValor; delete p.comisionMoneda;
         changed = true;
       }
     });
@@ -398,8 +420,24 @@
   let activeView = 'resumen';
   const navItems = document.querySelectorAll('.nav-item[data-view]');
 
+  // Plan de la licencia (lo decide la pantalla de licencia con 'rc-plan'):
+  // "redactor" deja solo el redactor y Configuración; "completo", todo.
+  const VISTAS_PLAN_REDACTOR = ['redactor', 'configuracion'];
+  let planLicencia = window.rcPlan || 'completo';
+  function soloRedactor(){ return planLicencia === 'redactor'; }
+  function aplicarPlan(plan){
+    planLicencia = plan === 'redactor' ? 'redactor' : 'completo';
+    document.body.dataset.plan = planLicencia;
+    if (soloRedactor()) {
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      if (!VISTAS_PLAN_REDACTOR.includes(activeView)) showView('redactor');
+    }
+  }
+  document.addEventListener('rc-plan', (e) => aplicarPlan(e.detail));
+
   function showView(name){
     if (!VIEW_TITLES[name]) name = 'resumen';
+    if (soloRedactor() && !VISTAS_PLAN_REDACTOR.includes(name)) name = 'redactor';
     activeView = name;
     document.body.dataset.activeView = name;
     document.querySelectorAll('.view').forEach(v => { v.hidden = v.dataset.view !== name; });
@@ -474,7 +512,7 @@
         : key === 'reparacionesAbiertas' ? db.reparaciones.filter(r => r.estado !== 'resuelta').length
         : key === 'casosAbiertos' ? db.casos.filter(casoAbierto).length
         : key === 'agendaPendiente' ? pendientesHoy().length
-        : key === 'liquidacionesPendientes' ? liquidacionesDelMes(addMonthsP(monthOf(todayStr()), -1)).filter(l => !l.registro && l.neto > 0).length
+        : key === 'liquidacionesPendientes' ? liquidacionesDelMes(addMonthsP(monthOf(todayStr()), -1)).filter(liqPendiente).length
         : db[key].length;
       el.textContent = n ? String(n) : '';
     });
@@ -557,11 +595,12 @@
           '<button type="button" class="btn-panel" data-act="pagar" data-id="' + esc(c.id) + '" data-periodo="' + esc(d.primerPeriodo) + '">Registrar pago</button></div>';
       }).join('');
     const mesAnterior = addMonthsP(mes, -1);
-    const liqPendientes = liquidacionesDelMes(mesAnterior).filter(l => !l.registro && l.neto > 0);
+    const liqPendientes = liquidacionesDelMes(mesAnterior).filter(liqPendiente);
+    const montos = (fn) => Object.entries(sumByMoneda(liqPendientes, fn, l => l.moneda)).filter(([, n]) => n > 0).map(([m, n]) => esc(fmtMoney(n, m))).join(' · ') || '—';
     const alertaLiq = liqPendientes.length
       ? '<div class="alert-row">' + badge('parcial', 'Liquidación') +
-          '<div class="alert-main"><strong>' + plural(liqPendientes.length, 'propietario', 'propietarios') + ' sin liquidar de ' + esc(fmtPeriodo(mesAnterior)) + '</strong>' +
-          '<span class="cell-sub">Por transferir: ' + Object.entries(sumByMoneda(liqPendientes, l => l.neto, l => l.moneda)).map(([m, n]) => esc(fmtMoney(n, m))).join(' · ') + '</span></div>' +
+          '<div class="alert-main"><strong>' + plural(liqPendientes.length, 'edificio', 'edificios') + ' sin liquidar de ' + esc(fmtPeriodo(mesAnterior)) + '</strong>' +
+          '<span class="cell-sub">Tu comisión: ' + montos(l => l.comision) + ' · Al propietario: ' + montos(l => l.neto) + '</span></div>' +
           '<button type="button" class="btn-panel" data-act="ver-liquidacion" data-id="" data-periodo="' + esc(mesAnterior) + '">Ver liquidaciones</button></div>'
       : '';
     const proximos = db.eventos.filter(ev => !ev.hecho && ev.fecha <= addDays(hoy, 3))
@@ -577,11 +616,11 @@
       '<div class="alert-main"><strong>' + esc(contractTitle(c)) + '</strong>' +
       '<span class="cell-sub">De ' + esc(fmtMoney(a.actual, c.moneda)) + ' a ' + esc(fmtMoney(a.nuevo, c.moneda)) + ' desde ' + esc(fmtPeriodo(a.periodo)) + ' (' + esc(fmtNumber(c.aumentoPct).replace(/[.,]00$/, '')) + '%)</span></div>' +
       '<button type="button" class="btn-panel" data-act="aumento" data-id="' + esc(c.id) + '">Aplicar aumento</button></div>').join('');
-    const porEnviar = Number(hoy.slice(8)) <= 10 ? liquidacionesDelMes(mesAnterior).filter(f => !estadoEnviado(f.propietario, mesAnterior)) : [];
+    const porEnviar = Number(hoy.slice(8)) <= 10 ? filasEstados(mesAnterior).filter(f => !estadoEnviado(f, mesAnterior)) : [];
     const alertaEstados = porEnviar.length
-      ? '<div class="alert-row">' + badge('proximo', 'Estados de cuenta') +
-          '<div class="alert-main"><strong>' + plural(porEnviar.length, 'estado de cuenta', 'estados de cuenta') + ' de ' + esc(fmtPeriodo(mesAnterior)) + ' por enviar</strong>' +
-          '<span class="cell-sub">' + esc(porEnviar.map(f => f.propietario.nombre).join(', ')) + '</span></div>' +
+      ? '<div class="alert-row">' + badge('proximo', 'Liquidaciones') +
+          '<div class="alert-main"><strong>' + plural(porEnviar.length, 'liquidación', 'liquidaciones') + ' de ' + esc(fmtPeriodo(mesAnterior)) + ' por enviar a los propietarios</strong>' +
+          '<span class="cell-sub">' + esc(porEnviar.map(f => edificioNombre(f) + ' (' + f.propietario.nombre + ')').join(', ')) + '</span></div>' +
           '<button type="button" class="btn-panel" data-act="estados-cuenta-mes" data-id="" data-periodo="' + esc(mesAnterior) + '">Enviar</button></div>'
       : '';
     const urgentes = db.reparaciones.filter(r => r.estado !== 'resuelta' && (r.prioridad === 'urgente' || r.prioridad === 'alta'));
@@ -684,7 +723,7 @@
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
     const el = $('tableEdificios');
     if (!db.edificios.length) {
-      el.innerHTML = '<div class="mgmt-card">' + emptyState('Todavía no hay edificios', 'Registra los edificios que administras: al indicar cuántos apartamentos tiene cada uno, se crean automáticamente.', '<button type="button" class="btn-brass" data-act="nuevo-edificio">+ Nuevo edificio</button>') + '</div>';
+      el.innerHTML = '<div class="mgmt-card">' + emptyState('Todavía no hay edificios', 'Sus apartamentos se crean solos.', '<button type="button" class="btn-brass" data-act="nuevo-edificio">+ Nuevo edificio</button>') + '</div>';
       return;
     }
     if (!list.length) { el.innerHTML = '<div class="mgmt-card">' + emptyState('Sin resultados', 'Ningún edificio coincide con la búsqueda.') + '</div>'; return; }
@@ -693,7 +732,7 @@
       const occ = unidades.filter(u => activeContractOfUnit(u.id)).length;
       const pct = unidades.length ? Math.round(occ / unidades.length * 100) : 0;
       const dueno = byId(db.propietarios, b.propietarioId);
-      const sub = [b.direccion, dueno ? 'Propietario: ' + dueno.nombre : 'Sin propietario asignado'].filter(Boolean).join(' · ');
+      const sub = [b.direccion, dueno ? 'Propietario: ' + dueno.nombre : 'Sin propietario asignado', 'Comisión: ' + comisionLabel(b)].filter(Boolean).join(' · ');
       return '<article class="bld-card">' +
         '<div class="bld-head">' +
           '<div class="bld-title"><h3>' + esc(b.nombre) + '</h3>' + (sub ? '<span class="cell-sub">' + esc(sub) + '</span>' : '') + '</div>' +
@@ -743,12 +782,14 @@
       { name:'nombre', label:'Nombre del edificio', required:true, full:true, placeholder:'Ej: Residencial Las Palmas' },
       { name:'direccion', label:'Dirección', full:true, placeholder:'Calle, número, sector, ciudad' },
       { name:'cantidad', label:'Cantidad de apartamentos', type:'number', required:true, min:0, max:MAX_UNIDADES, step:'1',
-        help: current ? 'Si la aumentas se crean los que faltan; si la reduces se eliminan apartamentos libres, empezando por los pisos más altos.' : 'Se crearán automáticamente, uno por casilla.' },
-      { name:'pisos', label:'Pisos', type:'number', min:1, max:200, step:'1',
-        help:'Con varios pisos se numeran 101, 102, 201...; con uno solo, 1, 2, 3...' },
+        help: current ? 'Al reducir solo se quitan apartamentos libres.' : '' },
+      { name:'pisos', label:'Pisos', type:'number', min:1, max:200, step:'1' },
       { name:'propietarioId', label:'Propietario', type:'select', options: propietarioOptions('— Sin asignar —') },
-      { name:'propietarioNuevo', label:'…o registra uno nuevo', placeholder:'Nombre del propietario nuevo',
-        help:'Se crea en Propietarios; luego puedes completar sus datos y su comisión.' },
+      { name:'propietarioNuevo', label:'…o registra uno nuevo', placeholder:'Nombre del propietario nuevo' },
+      { name:'_comision', type:'heading', label:'Comisión del abogado' },
+      { name:'comisionTipo', label:'Tipo de comisión', type:'select', options: COMISION_TIPOS },
+      { name:'comisionValor', label:'Valor de la comisión', type:'number', min:0, step:'0.01', help:'Porcentaje o monto fijo.' },
+      { name:'comisionMoneda', label:'Moneda (si es monto fijo)', type:'select', options: MONEDAS.map(m => ({ value:m, label:m })) },
       { name:'notas', label:'Notas', type:'textarea', full:true }
     ];
   }
@@ -758,10 +799,10 @@
     const existentes = current ? db.unidades.filter(u => u.edificioId === current.id) : [];
     openForm({
       title: current ? 'Editar edificio' : 'Nuevo edificio',
-      subtitle: 'El propietario se usa como arrendador en los contratos de este edificio.',
       fields: edificioFields(current),
-      values: Object.assign({ pisos: 1 }, current, { cantidad: current ? existentes.length : '' }),
+      values: Object.assign({ pisos: 1, comisionTipo: ajuste('comisionTipo'), comisionValor: ajuste('comisionValor'), comisionMoneda: ajuste('moneda') }, current, { cantidad: current ? existentes.length : '' }),
       async onSave(values){
+        if (values.comisionTipo === 'porcentaje' && values.comisionValor > 100) return 'El porcentaje de comisión no puede ser mayor que 100.';
         const cantidad = values.cantidad;
         const pisos = values.pisos == null ? 1 : values.pisos;
         delete values.cantidad;
@@ -854,7 +895,7 @@
     const el = $('tableUnidades');
     if (!db.unidades.length) {
       el.innerHTML = db.edificios.length
-        ? emptyState('Todavía no hay apartamentos', 'Añade los apartamentos, locales o casas de cada edificio.', '<button type="button" class="btn-brass" data-act="nueva-unidad">+ Nuevo apartamento</button>')
+        ? emptyState('Todavía no hay apartamentos', 'Apartamentos, locales o casas.', '<button type="button" class="btn-brass" data-act="nueva-unidad">+ Nuevo apartamento</button>')
         : emptyState('Primero registra un edificio', 'Cada apartamento pertenece a un edificio.', '<button type="button" class="btn-brass" data-act="nuevo-edificio">+ Nuevo edificio</button>');
       return;
     }
@@ -895,11 +936,13 @@
       { name:'edificioId', label:'Edificio', type:'select', required:true,
         options: db.edificios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(b => ({ value:b.id, label:b.nombre })) },
       { name:'identificador', label:'Apartamento / unidad', required:true, placeholder:'Ej: 3B' },
-      { name:'piso', label:'Piso', type:'number', min:0, step:'1', help:'Ordena la casilla en la vista de edificios.' },
+      { name:'piso', label:'Piso', type:'number', min:0, step:'1' },
       { name:'tipo', label:'Tipo', type:'select', options: TIPOS_UNIDAD.map(t => ({ value:t, label:t })) },
-      { name:'propietarioId', label:'Propietario', type:'select', options: propietarioOptions('— El mismo del edificio —'),
-        help:'Solo si este apartamento es de otra persona.' },
-      { name:'renta', label:'Renta mensual de referencia', type:'number', min:0, step:'0.01', help:'Se propone como monto al crear un contrato.' },
+      { name:'propietarioId', label:'Propietario', type:'select', options: propietarioOptions('— El mismo del edificio —') },
+      { name:'comisionTipo', label:'Comisión del abogado', type:'select', options: [{ value:'', label:'— La del edificio —' }].concat(COMISION_TIPOS) },
+      { name:'comisionValor', label:'Valor de la comisión', type:'number', min:0, step:'0.01' },
+      { name:'comisionMoneda', label:'Moneda (si es monto fijo)', type:'select', options: MONEDAS.map(m => ({ value:m, label:m })) },
+      { name:'renta', label:'Renta mensual de referencia', type:'number', min:0, step:'0.01' },
       { name:'habitaciones', label:'Habitaciones', type:'number', min:0, step:'1' },
       { name:'banos', label:'Baños', type:'number', min:0, step:'0.5' },
       { name:'notas', label:'Notas', type:'textarea', full:true }
@@ -920,7 +963,9 @@
       async onSave(values){
         const repetido = db.unidades.find(u => u.id !== (current && current.id) && u.edificioId === values.edificioId && normalize(u.identificador) === normalize(values.identificador));
         if (repetido) return 'Ya existe un apartamento "' + values.identificador + '" en ese edificio.';
+        if (values.comisionTipo === 'porcentaje' && values.comisionValor > 100) return 'El porcentaje de comisión no puede ser mayor que 100.';
         values.propietarioId = values.propietarioId || null;
+        if (!values.comisionTipo) { values.comisionTipo = null; values.comisionValor = null; values.comisionMoneda = null; }
         if (current) Object.assign(current, values);
         else db.unidades.push(Object.assign({ id: uid('apt'), creado: new Date().toISOString() }, values));
         return persist();
@@ -950,7 +995,7 @@
     const q = normalize(searchInquilinos.value);
     const el = $('tableInquilinos');
     if (!db.inquilinos.length) {
-      el.innerHTML = emptyState('Todavía no hay inquilinos', 'Registra a cada inquilino para asociarle sus contratos.', '<button type="button" class="btn-brass" data-act="nuevo-inquilino">+ Nuevo inquilino</button>');
+      el.innerHTML = emptyState('Todavía no hay inquilinos', 'Para asociarles sus contratos.', '<button type="button" class="btn-brass" data-act="nuevo-inquilino">+ Nuevo inquilino</button>');
       return;
     }
     const list = db.inquilinos
@@ -1226,7 +1271,7 @@
     const estado = filterContratosEstado.value;
     const el = $('tableContratos');
     if (!db.contratos.length) {
-      el.innerHTML = emptyState('Todavía no hay contratos', 'Un contrato une a un inquilino con un apartamento durante un periodo.', '<button type="button" class="btn-brass" data-act="nuevo-contrato">+ Nuevo contrato</button>');
+      el.innerHTML = emptyState('Todavía no hay contratos', 'Une un inquilino con un apartamento.', '<button type="button" class="btn-brass" data-act="nuevo-contrato">+ Nuevo contrato</button>');
       return;
     }
     const list = db.contratos.filter(c => {
@@ -1254,7 +1299,7 @@
         options: unidades.map(u => ({ value:u.id, label:unidadLabel(u) })),
         help: unidades.length ? 'Solo se muestran los apartamentos sin un contrato activo.' : 'No hay apartamentos disponibles: finaliza un contrato o registra un apartamento nuevo.' },
       { name:'fechaInicio', label:'Fecha de inicio', type:'date', required:true },
-      { name:'fechaFin', label:'Fecha de fin', type:'date', required:true, help:'Al elegir el inicio se propone un año.' },
+      { name:'fechaFin', label:'Fecha de fin', type:'date', required:true },
       { name:'moneda', label:'Moneda', type:'select', options: MONEDAS.map(m => ({ value:m, label:m })) },
       { name:'monto', label:'Alquiler mensual', type:'number', required:true, min:0, step:'0.01' },
       { name:'deposito', label:'Depósito', type:'number', min:0, step:'0.01' },
@@ -1262,16 +1307,16 @@
       { name:'estado', label:'Estado', type:'select', options:[{ value:'activo', label:'Activo' }, { value:'finalizado', label:'Finalizado' }] },
       { name:'cotitulares', label:'Otros inquilinos que firman el contrato', type:'checks', full:true,
         options: db.inquilinos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(t => ({ value:t.id, label:t.nombre + (t.documento ? ' — ' + t.documento : '') })),
-        help:'Opcional. Por ejemplo, la pareja del inquilino principal. Se ignora si marcas al mismo inquilino principal.' },
-      { name:'_mora', type:'heading', label:'Recargo por mora', help:'Se cobra una sola vez por cuota si no se pagó completa al terminar los días de gracia.' },
+        help:'Opcional.' },
+      { name:'_mora', type:'heading', label:'Recargo por mora' },
       { name:'moraTipo', label:'Tipo de recargo', type:'select', options:[{ value:'ninguna', label:'Sin recargo' }, { value:'porcentaje', label:'Porcentaje de la cuota' }, { value:'fijo', label:'Monto fijo' }] },
-      { name:'moraValor', label:'Valor del recargo', type:'number', min:0, step:'0.01', help:'Porcentaje (p. ej. 5) o monto, según el tipo.' },
+      { name:'moraValor', label:'Valor del recargo', type:'number', min:0, step:'0.01' },
       { name:'moraGracia', label:'Días de gracia', type:'number', min:0, max:60, step:'1' },
       { name:'_aumento', type:'heading', label:'Aumento e impuestos', help:'Opcional.' },
-      { name:'aumentoPct', label:'Aumento anual (%)', type:'number', min:0, max:100, step:'0.01', help:'Se avisa antes de cada aniversario para aplicarlo.' },
+      { name:'aumentoPct', label:'Aumento anual (%)', type:'number', min:0, max:100, step:'0.01' },
       { name:'aumentoCada', label:'Cada cuántos meses', type:'number', min:1, max:60, step:'1' },
-      { name:'itbis', label:'ITBIS sobre el alquiler (%)', type:'number', min:0, max:100, step:'0.01', help:'Locales comerciales (normalmente 18). Se suma a cada cuota.' },
-      { name:'retencionIsr', label:'Retención de ISR del inquilino (%)', type:'number', min:0, max:100, step:'0.01', help:'Si el inquilino es una empresa que retiene ISR del alquiler (normalmente 10).' },
+      { name:'itbis', label:'ITBIS sobre el alquiler (%)', type:'number', min:0, max:100, step:'0.01', help:'Normalmente 18.' },
+      { name:'retencionIsr', label:'Retención de ISR del inquilino (%)', type:'number', min:0, max:100, step:'0.01', help:'Normalmente 10.' },
       { name:'_fiador', type:'heading', label:'Fiador o garante', help:'Opcional.' },
       { name:'fiadorNombre', label:'Nombre del fiador' },
       { name:'fiadorDocumento', label:'Cédula del fiador', documento:'cedula', placeholder:'000-0000000-0',
@@ -1424,15 +1469,14 @@
     const fields = [
       { name:'deposito', label:'Depósito acordado', type:'number', required:true, min:0, step:'0.01' },
       { name:'fechaRecibido', label:'Fecha en que se recibió', type:'date' },
-      { name:'_fin', type:'heading', label:'Al terminar el contrato', help:'Completa esto cuando se devuelva el depósito.' },
+      { name:'_fin', type:'heading', label:'Al terminar el contrato' },
       { name:'fechaLiquidacion', label:'Fecha de devolución', type:'date' },
       { name:'devuelto', label:'Monto devuelto', type:'number', min:0, step:'0.01' },
       { name:'retenido', label:'Monto retenido', type:'number', min:0, step:'0.01' },
       { name:'motivo', label:'Motivo de la retención', type:'textarea', full:true, placeholder:'Daños, deuda pendiente, servicios sin pagar...' }
     ];
     if (deuda.monto > 0 && !info.aplicadoDeuda) {
-      fields.push({ name:'aplicarDeuda', label:'Aplicar lo retenido a la deuda (' + fmtMoney(deuda.monto, c.moneda) + ')', type:'checkbox', full:true,
-        help:'Se registra como pagos de las cuotas vencidas más antiguas, con método "Depósito".' });
+      fields.push({ name:'aplicarDeuda', label:'Aplicar lo retenido a la deuda (' + fmtMoney(deuda.monto, c.moneda) + ')', type:'checkbox', full:true });
     }
     openForm({
       title: 'Depósito del contrato',
@@ -1476,7 +1520,7 @@
       fields: [
         { name:'fechaInicio', label:'Inicio del nuevo periodo', type:'date', required:true },
         { name:'fechaFin', label:'Fin del nuevo periodo', type:'date', required:true },
-        { name:'aumento', label:'Aumento (%)', type:'number', min:0, max:100, step:'0.01', help:'Calcula el nuevo alquiler a partir del actual.' },
+        { name:'aumento', label:'Aumento (%)', type:'number', min:0, max:100, step:'0.01' },
         { name:'monto', label:'Nuevo alquiler mensual', type:'number', required:true, min:0, step:'0.01' },
         { name:'diaPago', label:'Día de pago (1-31)', type:'number', min:1, max:31, step:'1' },
         { name:'notas', label:'Notas', type:'textarea', full:true }
@@ -2120,7 +2164,7 @@
       { name:'periodo', label: nuevo ? 'Mes que paga (o el primero, si son varios)' : 'Mes que paga', type:'month', required:true },
       { name:'fecha', label:'Fecha de pago', type:'date', required:true },
       { name:'monto', label:'Monto recibido', type:'number', required:true, min:0, step:'0.01' },
-      { name:'retencion', label:'ISR retenido por el inquilino', type:'number', min:0, step:'0.01', help:'Solo si el inquilino es una empresa que retiene ISR del alquiler. Cuenta como pagado.' },
+      { name:'retencion', label:'ISR retenido por el inquilino', type:'number', min:0, step:'0.01' },
       nuevo && { name:'repartir', label:'Si el monto supera la cuota, aplicar el resto a los meses pendientes siguientes', type:'checkbox', full:true },
       { name:'metodo', label:'Método de pago', type:'select', options: METODOS_PAGO.map(m => ({ value:m, label:m })) },
       { name:'referencia', label:'Referencia / No. de transacción', full:true },
@@ -2420,7 +2464,7 @@
 
     if (!db.gastos.length) {
       el.innerHTML = db.edificios.length
-        ? emptyState('Todavía no hay gastos', 'Registra reparaciones, la luz o el internet de las áreas comunes, limpieza, seguridad...', '<button type="button" class="btn-brass" data-act="nuevo-gasto">+ Nuevo gasto</button>')
+        ? emptyState('Todavía no hay gastos', 'Reparaciones, servicios, limpieza...', '<button type="button" class="btn-brass" data-act="nuevo-gasto">+ Nuevo gasto</button>')
         : emptyState('Primero registra un edificio', 'Cada gasto se asigna a un edificio.', '<button type="button" class="btn-brass" data-act="nuevo-edificio">+ Nuevo edificio</button>');
       return;
     }
@@ -2474,7 +2518,6 @@
     if (!values.edificioId && db.edificios.length === 1) values.edificioId = db.edificios[0].id;
     openForm({
       title: current ? 'Editar gasto' : 'Nuevo gasto',
-      subtitle: 'Elige "Áreas comunes" para gastos de todo el edificio (luz, internet, limpieza...) o un apartamento para reparaciones de esa unidad.',
       fields: gastoFields(values.edificioId),
       values,
       onInput(form, name){
@@ -2676,19 +2719,21 @@
   // ---------------------------------------------------------------
   // Propietarios y liquidaciones.
   //
-  // El despacho cobra los alquileres en nombre de cada propietario y le
-  // transfiere cada mes: lo cobrado − los gastos de sus inmuebles − la
-  // comisión de administración. Un apartamento es del propietario del
-  // edificio salvo que tenga uno propio; los gastos de áreas comunes se
-  // cargan al propietario del edificio. Se calcula por moneda.
+  // El abogado cobra los alquileres y cada mes hace la liquidación de cada
+  // edificio para cobrarse su comisión: la de cada apartamento es la del
+  // edificio salvo que tenga una propia. Al propietario se le transfiere
+  // lo cobrado − la comisión (− los gastos, si en Configuración ese
+  // edificio los descuenta). Un apartamento es del propietario del
+  // edificio salvo que tenga uno propio, así que un edificio puede tener
+  // una liquidación por cada dueño. Se calcula por moneda.
   //
-  // Al registrar la transferencia se guarda una foto de los importes
+  // Al registrar la liquidación se guarda una foto de los importes
   // (db.liquidaciones) para que quede constancia aunque después cambien
   // los pagos o gastos de ese mes; si cambian, se avisa de la diferencia.
   // ---------------------------------------------------------------
   const COMISION_TIPOS = [
     { value:'porcentaje', label:'Porcentaje de lo cobrado' },
-    { value:'fijo', label:'Monto fijo mensual' },
+    { value:'fijo', label:'Monto fijo por apartamento alquilado' },
     { value:'ninguna', label:'Sin comisión' }
   ];
 
@@ -2705,15 +2750,30 @@
     if (!nombre) return null;
     let p = db.propietarios.find(x => normalize(x.nombre) === normalize(nombre));
     if (!p) {
-      p = { id: uid('prp'), creado: new Date().toISOString(), nombre, comisionTipo: ajuste('comisionTipo'), comisionValor: ajuste('comisionValor'), comisionMoneda: ajuste('moneda') };
+      p = { id: uid('prp'), creado: new Date().toISOString(), nombre };
       db.propietarios.push(p);
     }
     return p.id;
   }
 
-  function comisionLabel(p){
-    if (!p || p.comisionTipo === 'ninguna' || !(Number(p.comisionValor) > 0)) return 'Sin comisión';
-    return p.comisionTipo === 'fijo' ? fmtMoney(p.comisionValor, p.comisionMoneda) + ' al mes' : fmtNumber(p.comisionValor).replace(/[.,]00$/, '') + '% de lo cobrado';
+  // Comisión del abogado de un edificio o apartamento ({ comisionTipo, comisionValor, comisionMoneda }).
+  function comisionLabel(x){
+    if (!x || !x.comisionTipo || x.comisionTipo === 'ninguna' || !(Number(x.comisionValor) > 0)) return 'Sin comisión';
+    return x.comisionTipo === 'fijo' ? fmtMoney(x.comisionValor, x.comisionMoneda) + ' al mes' : fmtNumber(x.comisionValor).replace(/[.,]00$/, '') + '% de lo cobrado';
+  }
+  // La de un apartamento: la suya si la tiene; si no, la de su edificio.
+  function comisionDeUnidad(u){
+    return u && u.comisionTipo ? u : (edificioDe(u) || {});
+  }
+  // Por defecto los gastos se descuentan al propietario; en Configuración
+  // se puede desactivar por edificio.
+  function descuentaGastos(b){ return !b || b.descontarGastos !== false; }
+
+  // ¿Estuvo alquilado el apartamento en algún día del mes? (para la comisión fija)
+  function alquiladaEnMes(unidadId, periodo){
+    const ini = periodo + '-01', fin = periodo + '-31';
+    return db.contratos.some(c => c.unidadId === unidadId && (c.fechaInicio || '') <= fin &&
+      (isActive(c) || (c.fechaFinalizacion || c.fechaFin || '') >= ini));
   }
 
   function inmueblesDe(propId){
@@ -2730,14 +2790,14 @@
     const q = normalize(searchPropietarios.value);
     const el = $('tablePropietarios');
     if (!db.propietarios.length) {
-      el.innerHTML = emptyState('Todavía no hay propietarios', 'Registra a los dueños de los inmuebles con su comisión y su cuenta bancaria, y asígnalos a sus edificios.', '<button type="button" class="btn-brass" data-act="nuevo-propietario">+ Nuevo propietario</button>');
+      el.innerHTML = emptyState('Todavía no hay propietarios', 'Dueños y su cuenta bancaria.', '<button type="button" class="btn-brass" data-act="nuevo-propietario">+ Nuevo propietario</button>');
       return;
     }
     const list = db.propietarios
       .filter(p => !q || normalize([p.nombre, p.documento, p.telefono, p.email].join(' ')).includes(q))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
     if (!list.length) { el.innerHTML = emptyState('Sin resultados', 'Ningún propietario coincide con la búsqueda.'); return; }
-    el.innerHTML = '<table class="data-table"><thead><tr><th>Propietario</th><th>Contacto</th><th>Inmuebles</th><th>Comisión</th><th>Cuenta para transferir</th><th></th></tr></thead><tbody>' +
+    el.innerHTML = '<table class="data-table"><thead><tr><th>Propietario</th><th>Contacto</th><th>Inmuebles</th><th>Cuenta para transferir</th><th></th></tr></thead><tbody>' +
       list.map(p => {
         const inm = inmueblesDe(p.id);
         const ocupados = inm.unidades.filter(u => activeContractOfUnit(u.id)).length;
@@ -2746,7 +2806,6 @@
           '<td>' + (p.telefono ? esc(p.telefono) : '<span class="muted">—</span>') + (p.email ? '<span class="cell-sub">' + esc(p.email) + '</span>' : '') + '</td>' +
           '<td>' + (inm.unidades.length ? plural(inm.unidades.length, 'apartamento', 'apartamentos') + ' · ' + ocupados + ' ocupados' : '<span class="muted">Ninguno</span>') +
             (nombresEdificios ? '<span class="cell-sub">' + esc(nombresEdificios) + '</span>' : '') + '</td>' +
-          '<td>' + (comisionLabel(p) === 'Sin comisión' ? '<span class="muted">Sin comisión</span>' : esc(comisionLabel(p))) + '</td>' +
           '<td>' + (p.cuenta ? esc(p.cuenta) + '<span class="cell-sub">' + esc([p.banco, p.titular].filter(Boolean).join(' · ')) + '</span>' : '<span class="muted">—</span>') + '</td>' +
           '<td><div class="row-actions">' +
             '<button type="button" class="btn-brass" data-act="ver-liquidacion" data-id="' + esc(p.id) + '">Liquidación</button>' +
@@ -2762,9 +2821,6 @@
     { name:'telefono', label:'Teléfono', type:'tel' },
     { name:'email', label:'Correo electrónico', type:'email' },
     { name:'direccion', label:'Domicilio' },
-    { name:'comisionTipo', label:'Comisión de administración', type:'select', options: COMISION_TIPOS },
-    { name:'comisionValor', label:'Valor de la comisión', type:'number', min:0, step:'0.01', help:'Porcentaje (p. ej. 10) o monto fijo según el tipo.' },
-    { name:'comisionMoneda', label:'Moneda (si es monto fijo)', type:'select', options: MONEDAS.map(m => ({ value:m, label:m })) },
     { name:'banco', label:'Banco' },
     { name:'cuenta', label:'No. de cuenta' },
     { name:'titular', label:'Titular de la cuenta', full:true, placeholder:'Si es distinto del propietario' },
@@ -2775,14 +2831,12 @@
     const current = id ? byId(db.propietarios, id) : null;
     openForm({
       title: current ? 'Editar propietario' : 'Nuevo propietario',
-      subtitle: 'La comisión se descuenta en la liquidación mensual. La cuenta aparece en el estado de cuenta.',
       fields: PROPIETARIO_FIELDS.map(f => f.name !== 'documento' ? f : Object.assign({}, f, {
         autocompletar: { tipo:'propietario', excluir: current && current.id,
           campos: { nombre:'nombre', telefono:'telefono', email:'email', direccion:'direccion' } }
       })),
-      values: current || { comisionTipo: ajuste('comisionTipo'), comisionValor: ajuste('comisionValor'), comisionMoneda: ajuste('moneda') },
+      values: current || {},
       async onSave(values){
-        if (values.comisionTipo === 'porcentaje' && values.comisionValor > 100) return 'El porcentaje de comisión no puede ser mayor que 100.';
         const repetido = db.propietarios.find(p => p.id !== (current && current.id) && normalize(p.nombre) === normalize(values.nombre));
         if (repetido) return 'Ya hay un propietario llamado "' + repetido.nombre + '".';
         if (current) Object.assign(current, values);
@@ -2808,6 +2862,7 @@
         '). Para conservar la contabilidad no se puede eliminar. Si alguna fue un error, anúlala primero en Liquidaciones. ¿Ir a ' + (meses.length > 1 ? 'la más reciente' : 'ella') + '?', 'No se puede eliminar');
       if (ver) {
         liqMes.value = registradas[0].periodo;
+        setLiqModo('mes');
         liqPropFiltro = id;
         showView('liquidaciones');
       }
@@ -2820,146 +2875,233 @@
   }
 
   // ---------- Cálculo de liquidaciones ----------
-  // Devuelve una fila por propietario y moneda con movimientos en el mes:
-  // { propietario, moneda, ingresos, gastos, comision, neto, pagos, gastosLista, registro }
+  // Devuelve una fila por edificio, propietario y moneda con movimientos en el mes:
+  // { edificio, propietario, moneda, ingresos, retenciones, gastos, comision,
+  //   itbisComision, neto, descuentaGastos, unidades:[{ unidad, ingresos, comision, comisionLabel, pagos }],
+  //   pagos, gastosLista, registro }
+  // Las liquidaciones registradas antes de que fueran por edificio (solo
+  // por propietario) salen como filas "anterior" con los importes guardados.
   function liquidacionesDelMes(periodo){
     const filas = new Map();
-    const fila = (propId, moneda) => {
-      const key = propId + '|' + moneda;
-      if (!filas.has(key)) filas.set(key, { propietarioId: propId, moneda, ingresos:0, retenciones:0, gastos:0, comision:0, itbisComision:0, pagos:[], gastosLista:[] });
+    const fila = (edificioId, propId, moneda) => {
+      const key = edificioId + '|' + propId + '|' + moneda;
+      if (!filas.has(key)) filas.set(key, { edificioId, propietarioId: propId, moneda, ingresos:0, retenciones:0, gastos:0, comision:0, itbisComision:0, porUnidad: new Map(), pagos:[], gastosLista:[] });
       return filas.get(key);
+    };
+    const deUnidad = (f, u) => {
+      if (!f.porUnidad.has(u.id)) f.porUnidad.set(u.id, { unidad: u, ingresos:0, comision:0, pagos:[] });
+      return f.porUnidad.get(u.id);
     };
     db.pagos.forEach(pg => {
       if (monthOf(pg.fecha) !== periodo) return;
       const c = byId(db.contratos, pg.contratoId);
-      const propId = c ? propietarioIdDe(byId(db.unidades, c.unidadId)) : null;
+      const u = c ? byId(db.unidades, c.unidadId) : null;
+      const propId = propietarioIdDe(u);
       if (!propId) return;
-      const f = fila(propId, pg.moneda || '');
+      const f = fila(u.edificioId, propId, pg.moneda || '');
       f.ingresos += Number(pg.monto) || 0;
       f.retenciones += Number(pg.retencion) || 0;
       f.pagos.push(pg);
+      const pu = deUnidad(f, u);
+      pu.ingresos += Number(pg.monto) || 0;
+      pu.pagos.push(pg);
     });
     db.gastos.forEach(g => {
       if (monthOf(g.fecha) !== periodo) return;
       const u = g.unidadId ? byId(db.unidades, g.unidadId) : null;
-      const propId = u ? propietarioIdDe(u) : (byId(db.edificios, g.edificioId) || {}).propietarioId;
-      if (!propId) return;
-      const f = fila(propId, g.moneda || '');
+      const edificioId = u ? u.edificioId : g.edificioId;
+      const propId = u ? propietarioIdDe(u) : (byId(db.edificios, edificioId) || {}).propietarioId;
+      if (!propId || !descuentaGastos(byId(db.edificios, edificioId))) return;
+      const f = fila(edificioId, propId, g.moneda || '');
       f.gastos += Number(g.monto) || 0;
       f.gastosLista.push(g);
     });
-    // Comisión fija: se cobra cada mes a quien tenga inmuebles, aunque no haya movimientos.
-    db.propietarios.forEach(p => {
-      if (p.comisionTipo === 'fijo' && Number(p.comisionValor) > 0 && inmueblesDe(p.id).unidades.length) fila(p.id, p.comisionMoneda || MONEDAS[0]);
+    // Comisión fija: se cobra por cada apartamento alquilado en el mes, aunque no haya pagado.
+    db.unidades.forEach(u => {
+      const k = comisionDeUnidad(u);
+      const propId = propietarioIdDe(u);
+      if (propId && k.comisionTipo === 'fijo' && Number(k.comisionValor) > 0 && alquiladaEnMes(u.id, periodo)) deUnidad(fila(u.edificioId, propId, k.comisionMoneda || MONEDAS[0]), u);
     });
     // Una liquidación registrada se muestra siempre en su mes, aunque ya no
-    // queden movimientos (p. ej. se borró un pago o el propietario ya no
-    // tiene inmuebles): así se ve la diferencia y se puede anular.
-    db.liquidaciones.forEach(l => { if (l.periodo === periodo) fila(l.propietarioId, l.moneda || ''); });
-    return [...filas.values()].map(f => {
-      const p = byId(db.propietarios, f.propietarioId);
-      if (p && p.comisionTipo === 'porcentaje' && Number(p.comisionValor) > 0) f.comision = f.ingresos * Number(p.comisionValor) / 100;
-      if (p && p.comisionTipo === 'fijo' && Number(p.comisionValor) > 0 && (p.comisionMoneda || MONEDAS[0]) === f.moneda) f.comision = Number(p.comisionValor);
+    // queden movimientos (p. ej. se borró un pago o el apartamento cambió de
+    // dueño): así se ve la diferencia y se puede anular.
+    db.liquidaciones.forEach(l => { if (l.periodo === periodo && l.edificioId) fila(l.edificioId, l.propietarioId, l.moneda || ''); });
+    const itbis = Number(ajuste('itbisComision')) > 0 ? Number(ajuste('itbisComision')) : 0;
+    const out = [...filas.values()].map(f => {
+      f.unidades = [...f.porUnidad.values()].map(x => {
+        const k = comisionDeUnidad(x.unidad);
+        const v = Number(k.comisionValor);
+        if (v > 0 && k.comisionTipo === 'porcentaje') x.comision = round2(x.ingresos * v / 100);
+        if (v > 0 && k.comisionTipo === 'fijo' && (k.comisionMoneda || MONEDAS[0]) === f.moneda && alquiladaEnMes(x.unidad.id, periodo)) x.comision = round2(v);
+        x.ingresos = round2(x.ingresos);
+        x.comisionLabel = comisionLabel(k);
+        return x;
+      }).sort((a, b) => compareIds(a.unidad.identificador, b.unidad.identificador));
+      delete f.porUnidad;
       f.ingresos = round2(f.ingresos);
       f.gastos = round2(f.gastos);
-      f.comision = round2(f.comision);
       f.retenciones = round2(f.retenciones);
-      // ITBIS de la comisión del despacho (Configuración), que paga el propietario.
-      f.itbisComision = Number(ajuste('itbisComision')) > 0 ? round2(f.comision * Number(ajuste('itbisComision')) / 100) : 0;
+      f.comision = round2(f.unidades.reduce((s, x) => s + x.comision, 0));
+      // ITBIS de la comisión del abogado (Configuración), que paga el propietario.
+      f.itbisComision = itbis ? round2(f.comision * itbis / 100) : 0;
       // El ISR retenido no llega en efectivo: se descuenta de lo que se transfiere
       // (el propietario lo usa como crédito fiscal).
       f.neto = round2(f.ingresos - f.retenciones - f.gastos - f.comision - f.itbisComision);
-      f.propietario = p;
-      f.registro = db.liquidaciones.find(l => l.propietarioId === f.propietarioId && l.periodo === periodo && l.moneda === f.moneda) || null;
+      f.edificio = byId(db.edificios, f.edificioId);
+      f.propietario = byId(db.propietarios, f.propietarioId);
+      f.descuentaGastos = descuentaGastos(f.edificio);
+      f.registro = db.liquidaciones.find(l => l.edificioId === f.edificioId && l.propietarioId === f.propietarioId && l.periodo === periodo && l.moneda === f.moneda) || null;
+      f.periodo = periodo;
       return f;
     }).filter(f => f.propietario);
+    db.liquidaciones.forEach(l => {
+      if (l.periodo !== periodo || l.edificioId) return;
+      const p = byId(db.propietarios, l.propietarioId);
+      if (p) out.push({ anterior:true, periodo, edificioId:'', edificio:null, propietarioId:l.propietarioId, propietario:p, moneda:l.moneda || '',
+        ingresos:l.ingresos, retenciones:l.retenciones || 0, gastos:l.gastos, comision:l.comision, itbisComision:l.itbisComision || 0, neto:l.neto,
+        descuentaGastos:true, unidades:[], pagos:[], gastosLista:[], registro:l });
+    });
+    return out;
+  }
+
+  // Sin registrar y con algo que liquidar: la comisión del abogado o un saldo para el propietario.
+  function liqPendiente(f){ return !f.registro && (f.comision > 0 || f.neto > 0); }
+  function edificioNombre(f){ return f.anterior ? 'Liquidación anterior (por propietario)' : (f.edificio ? f.edificio.nombre : '(edificio eliminado)'); }
+  function ordenLiq(a, b){
+    return edificioNombre(a).localeCompare(edificioNombre(b)) || a.propietario.nombre.localeCompare(b.propietario.nombre) || a.moneda.localeCompare(b.moneda);
+  }
+
+  // Todas las liquidaciones, de todos los meses con movimientos (del
+  // primer pago, gasto, contrato o registro hasta el mes actual).
+  function liquidacionesDeTodo(){
+    const meses = [];
+    db.pagos.forEach(x => x.fecha && meses.push(monthOf(x.fecha)));
+    db.gastos.forEach(x => x.fecha && meses.push(monthOf(x.fecha)));
+    db.contratos.forEach(x => x.fechaInicio && meses.push(monthOf(x.fechaInicio)));
+    db.liquidaciones.forEach(x => x.periodo && meses.push(x.periodo));
+    const hasta = monthOf(todayStr());
+    let mes = meses.filter(Boolean).sort()[0];
+    if (!mes) return [];
+    const out = [];
+    for (let n = 0; mes <= hasta && n < 240; n++, mes = addMonthsP(mes, 1)) out.push(...liquidacionesDelMes(mes));
+    return out;
   }
 
   // ---------- Vista Liquidaciones ----------
+  // "Por mes" muestra un mes; "Todo", todas las liquidaciones juntas con su
+  // mes, para no perder ninguna. El estado (pendiente / registrada) filtra en ambos.
   const liqMes = $('liqMes');
   const liqPropietario = $('liqPropietario');
+  const liqEstado = $('liqEstado');
+  let liqModo = 'mes';
   liqMes.value = addMonthsP(monthOf(todayStr()), -1);
   liqMes.addEventListener('input', () => { if (liqMes.value) renderLiquidaciones(); });
+  liqEstado.addEventListener('input', renderLiquidaciones);
+  function setLiqModo(modo){
+    liqModo = modo === 'todo' ? 'todo' : 'mes';
+    document.querySelectorAll('[data-liq-modo]').forEach(b => {
+      b.classList.toggle('active', b.dataset.liqModo === liqModo);
+      b.setAttribute('aria-pressed', b.dataset.liqModo === liqModo ? 'true' : 'false');
+    });
+    $('liqMesControles').hidden = liqModo === 'todo';
+    $('btnEnvioEstados').hidden = liqModo === 'todo';
+  }
+  document.querySelectorAll('[data-liq-modo]').forEach(b => b.addEventListener('click', () => { setLiqModo(b.dataset.liqModo); renderLiquidaciones(); }));
   // El filtro se guarda aparte porque el <select> se reconstruye en cada render.
   let liqPropFiltro = '';
   liqPropietario.addEventListener('input', () => { liqPropFiltro = liqPropietario.value; renderLiquidaciones(); });
   $('liqPrev').addEventListener('click', () => { liqMes.value = addMonthsP(liqMes.value || monthOf(todayStr()), -1); renderLiquidaciones(); });
   $('liqNext').addEventListener('click', () => { liqMes.value = addMonthsP(liqMes.value || monthOf(todayStr()), 1); renderLiquidaciones(); });
 
-  function liqKey(f){ return f.propietarioId + '|' + f.moneda; }
+  function liqKey(f){ return f.periodo + '|' + (f.anterior ? 'anterior|' + f.registro.id : f.edificioId + '|' + f.propietarioId + '|' + f.moneda); }
 
   function renderLiquidaciones(){
     liqPropietario.innerHTML = propietarioOptions('Todos los propietarios').map(o => '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>').join('');
     liqPropietario.value = byId(db.propietarios, liqPropFiltro) ? liqPropFiltro : '';
     const periodo = liqMes.value || monthOf(todayStr());
-    const filas = liquidacionesDelMes(periodo)
+    const todo = liqModo === 'todo';
+    const filas = (todo ? liquidacionesDeTodo() : liquidacionesDelMes(periodo))
       .filter(f => !liqPropietario.value || f.propietarioId === liqPropietario.value)
-      .sort((a, b) => a.propietario.nombre.localeCompare(b.propietario.nombre) || a.moneda.localeCompare(b.moneda));
+      .filter(f => !liqEstado.value || (liqEstado.value === 'pendientes' ? !f.registro : !!f.registro))
+      .sort((a, b) => b.periodo.localeCompare(a.periodo) || ordenLiq(a, b));
     const pendientes = filas.filter(f => !f.registro);
+    const desde = filas.length ? filas[filas.length - 1].periodo : periodo;
 
     $('liqStats').innerHTML = [
-      stat('Cobrado en ' + MESES[Number(periodo.slice(5)) - 1], moneyLines(sumByMoneda(filas, f => f.ingresos, f => f.moneda)), 'Pagos de inquilinos del mes', true),
-      stat('Comisiones del despacho', moneyLines(sumByMoneda(filas, f => f.comision, f => f.moneda)), 'Lo que retiene la administración', true),
-      stat('Por transferir', moneyLines(sumByMoneda(pendientes.filter(f => f.neto > 0), f => f.neto, f => f.moneda)), pendientes.length ? plural(pendientes.length, 'liquidación pendiente', 'liquidaciones pendientes') : 'Todo transferido', true),
+      stat('Tu comisión', moneyLines(sumByMoneda(filas, f => f.comision, f => f.moneda)), todo ? 'Desde ' + fmtPeriodo(desde) : 'Lo que te corresponde como abogado', true),
+      stat(todo ? 'Cobrado' : 'Cobrado en ' + MESES[Number(periodo.slice(5)) - 1], moneyLines(sumByMoneda(filas, f => f.ingresos, f => f.moneda)), todo ? 'Pagos de inquilinos' : 'Pagos de inquilinos del mes', true),
+      stat('Por transferir a propietarios', moneyLines(sumByMoneda(pendientes.filter(f => f.neto > 0), f => f.neto, f => f.moneda)), pendientes.length ? plural(pendientes.length, 'liquidación pendiente', 'liquidaciones pendientes') : 'Todo liquidado', true),
       stat('Ya transferido', moneyLines(sumByMoneda(filas.filter(f => f.registro), f => f.registro.montoTransferido, f => f.moneda)), plural(filas.filter(f => f.registro).length, 'liquidación registrada', 'liquidaciones registradas'), true)
     ].join('');
 
-    $('liqTitulo').textContent = 'Liquidaciones de ' + fmtPeriodo(periodo);
-    if (!db.propietarios.length) {
-      $('liqTabla').innerHTML = emptyState('Primero registra a los propietarios', 'Asigna cada edificio a su propietario para calcular lo que le corresponde cada mes.', '<button type="button" class="btn-brass" data-act="nuevo-propietario">+ Nuevo propietario</button>');
+    $('liqTitulo').textContent = todo ? 'Todas las liquidaciones' + (filas.length ? ' · ' + filas.length : '') : 'Liquidaciones de ' + fmtPeriodo(periodo);
+    if (!db.edificios.length) {
+      $('liqTabla').innerHTML = emptyState('Primero registra los edificios', 'Cada edificio lleva tu comisión.', '<button type="button" class="btn-brass" data-act="nuevo-edificio">+ Nuevo edificio</button>');
+      return;
+    }
+    if (!filas.length && (todo || liqEstado.value)) {
+      $('liqTabla').innerHTML = emptyState('Sin liquidaciones', liqEstado.value ? 'Ninguna coincide con el filtro.' : 'Todavía no hay pagos ni gastos.');
       return;
     }
     if (!filas.length) {
       const sinDueno = db.edificios.filter(b => !b.propietarioId).length;
       $('liqTabla').innerHTML = emptyState('Sin movimientos en ' + fmtPeriodo(periodo), sinDueno
-        ? 'No hay pagos ni gastos de propietarios este mes. Ojo: ' + plural(sinDueno, 'edificio no tiene', 'edificios no tienen') + ' propietario asignado, y sus movimientos no se liquidan.'
-        : 'No hay pagos ni gastos de propietarios este mes.');
+        ? 'No hay pagos ni gastos este mes. Ojo: ' + plural(sinDueno, 'edificio no tiene', 'edificios no tienen') + ' propietario asignado, y sus movimientos no se liquidan.'
+        : 'No hay pagos ni gastos este mes.');
       return;
     }
-    $('liqTabla').innerHTML = '<table class="data-table"><thead><tr><th>Propietario</th><th class="num">Cobrado</th><th class="num">Gastos</th><th class="num">Comisión</th><th class="num">A transferir</th><th>Estado</th><th></th></tr></thead><tbody>' +
+    $('liqTabla').innerHTML = '<table class="data-table"><thead><tr>' + (todo ? '<th>Mes</th>' : '') + '<th>Edificio</th><th class="num">Cobrado</th><th class="num">Gastos</th><th class="num">Tu comisión</th><th class="num">Al propietario</th><th>Estado</th><th></th></tr></thead><tbody>' +
       filas.map(f => {
         const p = f.propietario;
         const diferencia = f.registro ? round2(f.neto - f.registro.neto) : 0;
         let estado;
         if (!f.registro) estado = f.neto < 0 ? badge('parcial-atrasado', 'A cargo del propietario') : badge('pendiente', 'Pendiente');
-        else estado = badge('pagado', (f.registro.montoTransferido < 0 ? 'Cobrado ' : 'Transferido ') + fmtDate(f.registro.fecha)) +
+        else estado = badge('pagado', (f.registro.montoTransferido < 0 ? 'Cobrado ' : 'Liquidado ') + fmtDate(f.registro.fecha)) +
           (Math.abs(diferencia) > 0.009 ? '<span class="cell-sub warn-text">Cambió ' + esc((diferencia > 0 ? '+' : '−') + fmtMoney(Math.abs(diferencia), f.moneda)) + ' desde que se registró</span>' : '');
-        return '<tr><td><span class="cell-main">' + esc(p.nombre) + '</span><span class="cell-sub">' + esc(comisionLabel(p)) +
-            (p.cuenta ? ' · Cta. ' + esc(p.cuenta) : '') + '</span></td>' +
-          '<td class="num">' + esc(fmtMoney(f.ingresos, f.moneda)) + '<span class="cell-sub">' + plural(new Set(f.pagos.map(pg => pg.grupo || pg.id)).size, 'pago', 'pagos') + '</span>' +
+        const desglose = f.unidades.length
+          ? '<details class="liq-desglose"><summary>' + plural(f.unidades.length, 'apartamento', 'apartamentos') + '</summary><ul>' +
+              f.unidades.map(x => '<li><span>Apto. ' + esc(x.unidad.identificador) + '</span><span>' + esc(fmtMoney(x.ingresos, f.moneda)) + ' cobrado · comisión ' +
+                (x.comision ? esc(fmtMoney(x.comision, f.moneda)) : '—') + ' <span class="muted">(' + esc(x.comisionLabel) + ')</span></span></li>').join('') +
+            '</ul></details>'
+          : '';
+        return '<tr>' + (todo ? '<td class="liq-mes">' + esc(fmtPeriodo(f.periodo)) + '</td>' : '') + '<td><span class="cell-main">' + esc(edificioNombre(f)) + '</span><span class="cell-sub">Propietario: ' + esc(p.nombre) +
+            (p.cuenta ? ' · Cta. ' + esc(p.cuenta) : '') + '</span>' + desglose + '</td>' +
+          '<td class="num">' + esc(fmtMoney(f.ingresos, f.moneda)) + (f.anterior ? '' : '<span class="cell-sub">' + plural(new Set(f.pagos.map(pg => pg.grupo || pg.id)).size, 'pago', 'pagos') + '</span>') +
             (f.retenciones ? '<span class="cell-sub">ISR retenido ' + esc(fmtMoney(f.retenciones, f.moneda)) + '</span>' : '') + '</td>' +
-          '<td class="num">' + (f.gastos ? esc(fmtMoney(f.gastos, f.moneda)) + '<span class="cell-sub">' + plural(f.gastosLista.length, 'gasto', 'gastos') + '</span>' : '<span class="muted">—</span>') + '</td>' +
-          '<td class="num">' + (f.comision ? esc(fmtMoney(f.comision, f.moneda)) + (f.itbisComision ? '<span class="cell-sub">+ ITBIS ' + esc(fmtMoney(f.itbisComision, f.moneda)) + '</span>' : '') : '<span class="muted">—</span>') + '</td>' +
-          '<td class="num"><span class="cell-main' + (f.neto < 0 ? ' negative' : '') + '">' + esc((f.neto < 0 ? '−' : '') + fmtMoney(Math.abs(f.neto), f.moneda)) + '</span></td>' +
+          '<td class="num">' + (!f.descuentaGastos ? '<span class="muted">No se descuentan</span>'
+            : f.gastos ? esc(fmtMoney(f.gastos, f.moneda)) + (f.anterior ? '' : '<span class="cell-sub">' + plural(f.gastosLista.length, 'gasto', 'gastos') + '</span>') : '<span class="muted">—</span>') + '</td>' +
+          '<td class="num">' + (f.comision ? '<span class="cell-main">' + esc(fmtMoney(f.comision, f.moneda)) + '</span>' + (f.itbisComision ? '<span class="cell-sub">+ ITBIS ' + esc(fmtMoney(f.itbisComision, f.moneda)) + '</span>' : '') : '<span class="muted">—</span>') + '</td>' +
+          '<td class="num"><span class="' + (f.neto < 0 ? 'negative' : '') + '">' + esc((f.neto < 0 ? '−' : '') + fmtMoney(Math.abs(f.neto), f.moneda)) + '</span></td>' +
           '<td>' + estado + '</td>' +
           '<td><div class="row-actions">' +
-            '<button type="button" class="btn-panel" data-act="estado-cuenta" data-id="' + esc(liqKey(f)) + '">Estado de cuenta</button>' +
+            (f.anterior ? '' : '<button type="button" class="btn-panel" data-act="estado-cuenta" data-id="' + esc(liqKey(f)) + '">Imprimir</button>') +
             (f.registro
               ? '<button type="button" class="btn-panel" data-act="anular-liquidacion" data-id="' + esc(f.registro.id) + '">Anular registro</button>'
-              : '<button type="button" class="btn-brass" data-act="registrar-liquidacion" data-id="' + esc(liqKey(f)) + '">' + (f.neto < 0 ? 'Registrar cobro' : 'Registrar transferencia') + '</button>') +
+              : '<button type="button" class="btn-brass" data-act="registrar-liquidacion" data-id="' + esc(liqKey(f)) + '">' + (f.neto < 0 ? 'Registrar cobro' : 'Registrar liquidación') + '</button>') +
           '</div></td></tr>';
       }).join('') + '</tbody></table>';
   }
 
+  // La clave empieza por el mes (AAAA-MM), así sirve en cualquiera de los dos modos.
   function filaDeLiquidacion(key){
-    const periodo = liqMes.value || monthOf(todayStr());
-    return liquidacionesDelMes(periodo).find(f => liqKey(f) === key) || null;
+    const periodo = String(key || '').split('|')[0];
+    return /^\d{4}-\d{2}$/.test(periodo) ? liquidacionesDelMes(periodo).find(f => liqKey(f) === key) || null : null;
   }
 
   function openLiquidacionForm(key){
     const f = filaDeLiquidacion(key);
-    if (!f) return;
-    const periodo = liqMes.value;
+    if (!f || f.anterior) return;
+    const periodo = f.periodo;
     const p = f.propietario;
     const aCargo = f.neto < 0;
     openForm({
-      title: aCargo ? 'Registrar cobro al propietario' : 'Registrar transferencia',
-      subtitle: p.nombre + ' · ' + fmtPeriodo(periodo) + ' · ' + (aCargo
-        ? 'Los gastos superan lo cobrado: el propietario debe ' + fmtMoney(Math.abs(f.neto), f.moneda) + '.'
-        : 'Corresponde transferir ' + fmtMoney(f.neto, f.moneda) + (p.cuenta ? ' a la cuenta ' + p.cuenta + (p.banco ? ' (' + p.banco + ')' : '') : '') + '.'),
+      title: aCargo ? 'Registrar cobro al propietario' : 'Registrar liquidación',
+      subtitle: edificioNombre(f) + ' · ' + p.nombre + ' · ' + fmtPeriodo(periodo) + ' · Tu comisión: ' + fmtMoney(f.comision + f.itbisComision, f.moneda) + '. ' + (aCargo
+        ? 'Lo descontado supera lo cobrado: el propietario debe ' + fmtMoney(Math.abs(f.neto), f.moneda) + '.'
+        : 'Al propietario le corresponden ' + fmtMoney(f.neto, f.moneda) + (p.cuenta ? ', a la cuenta ' + p.cuenta + (p.banco ? ' (' + p.banco + ')' : '') : '') + '.'),
       fields: [
         { name:'fecha', label:'Fecha', type:'date', required:true },
-        { name:'monto', label: aCargo ? 'Monto cobrado' : 'Monto transferido', type:'number', required:true, min:0, step:'0.01' },
+        { name:'monto', label: aCargo ? 'Monto cobrado al propietario' : 'Monto transferido al propietario', type:'number', required:true, min:0, step:'0.01' },
         { name:'metodo', label:'Método', type:'select', options: METODOS_PAGO.map(m => ({ value:m, label:m })) },
         { name:'referencia', label:'Referencia / No. de transacción' },
         { name:'notas', label:'Notas', type:'textarea', full:true }
@@ -2972,8 +3114,9 @@
         }
         db.liquidaciones.push({
           id: uid('liq'), creado: new Date().toISOString(),
-          propietarioId: f.propietarioId, periodo, moneda: f.moneda,
+          edificioId: f.edificioId, propietarioId: f.propietarioId, periodo, moneda: f.moneda,
           ingresos: f.ingresos, retenciones: f.retenciones, gastos: f.gastos, comision: f.comision, itbisComision: f.itbisComision, neto: f.neto,
+          unidades: f.unidades.map(x => ({ unidadId: x.unidad.id, ingresos: x.ingresos, comision: x.comision })),
           montoTransferido: aCargo ? -values.monto : values.monto,
           fecha: values.fecha, metodo: values.metodo, referencia: values.referencia, notas: values.notas
         });
@@ -2986,7 +3129,8 @@
     const l = byId(db.liquidaciones, id);
     if (!l) return;
     const p = byId(db.propietarios, l.propietarioId);
-    const ok = await ui.showConfirmDialog('¿Anular el registro de la liquidación de ' + (p ? p.nombre : 'este propietario') + ' de ' + fmtPeriodo(l.periodo) +
+    const b = l.edificioId ? byId(db.edificios, l.edificioId) : null;
+    const ok = await ui.showConfirmDialog('¿Anular el registro de la liquidación de ' + (b ? b.nombre + ' (' + (p ? p.nombre : 'propietario') + ')' : (p ? p.nombre : 'este propietario')) + ' de ' + fmtPeriodo(l.periodo) +
       ' (' + fmtMoney(Math.abs(l.montoTransferido), l.moneda) + ', ' + fmtDate(l.fecha) + ')? Volverá a quedar pendiente.', 'Anular registro');
     if (!ok) return;
     db.liquidaciones = db.liquidaciones.filter(x => x.id !== id);
@@ -2994,29 +3138,34 @@
     renderActive();
   }
 
-  // Estado de cuenta imprimible del propietario para un mes y una moneda.
+  // Liquidación imprimible de un edificio (y propietario) para un mes y una moneda.
   async function printEstadoCuenta(key){
     const f = filaDeLiquidacion(key);
-    if (!f) return;
-    await printHtml(estadoCuentaHtml(f, liqMes.value), tituloEstadoCuenta(f, liqMes.value));
+    if (!f || f.anterior) return;
+    await printHtml(estadoCuentaHtml(f, f.periodo), tituloEstadoCuenta(f, f.periodo));
   }
   function tituloEstadoCuenta(f, periodo){
-    return 'Estado_de_cuenta_' + f.propietario.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_') + '_' + periodo;
+    const limpio = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_');
+    return 'Liquidacion_' + limpio(edificioNombre(f)) + '_' + limpio(f.propietario.nombre) + '_' + periodo;
   }
   function estadoCuentaHtml(f, periodo){
     const p = f.propietario;
     const money = (n) => esc(fmtMoney(n, f.moneda));
     const th = (t, right) => '<th style="text-align:' + (right ? 'right' : 'left') + ';border-bottom:1.5px solid #333;padding:5px 6px;font-size:9.5pt;">' + t + '</th>';
     const td = (t, right) => '<td style="text-align:' + (right ? 'right' : 'left') + ';border-bottom:1px solid #ddd;padding:5px 6px;font-size:10pt;' + (right ? 'white-space:nowrap;' : '') + '">' + t + '</td>';
+    const unidadesRows = f.unidades.map(x => {
+      const nombres = [...new Set(x.pagos.map(pg => nombresInquilinos(byId(db.contratos, pg.contratoId) || {})).filter(Boolean))].join(', ');
+      return '<tr>' + td('Apto. ' + esc(x.unidad.identificador)) + td(esc(nombres || '—')) + td(esc(x.comisionLabel)) + td(money(x.ingresos), true) + td(money(x.comision), true) + '</tr>';
+    }).join('');
     const pagosRows = f.pagos.slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')).map(pg => {
       const c = byId(db.contratos, pg.contratoId) || {};
       const t = byId(db.inquilinos, c.inquilinoId) || {};
-      return '<tr>' + td(esc(fmtDate(pg.fecha))) + td(esc(t.nombre || '—')) + td(esc(unidadLabel(byId(db.unidades, c.unidadId)))) + td(esc(fmtPeriodo(pg.periodo))) +
+      return '<tr>' + td(esc(fmtDate(pg.fecha))) + td(esc(t.nombre || '—')) + td(esc((byId(db.unidades, c.unidadId) || {}).identificador || '—')) + td(esc(fmtPeriodo(pg.periodo))) +
         td('No. ' + esc(String(pg.numero || '').padStart(5, '0'))) + td(money(pg.monto), true) + '</tr>';
     }).join('');
     const gastosRows = f.gastosLista.slice().sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')).map(g => {
       const l = gastoLugar(g);
-      return '<tr>' + td(esc(fmtDate(g.fecha))) + td(esc(l.edificio) + ' · ' + esc(l.lugar)) + td(esc(g.categoria || '')) + td(esc(g.descripcion) + (g.proveedor ? ' (' + esc(g.proveedor) + ')' : '')) + td(money(g.monto), true) + '</tr>';
+      return '<tr>' + td(esc(fmtDate(g.fecha))) + td(esc(l.lugar)) + td(esc(g.categoria || '')) + td(esc(g.descripcion) + (g.proveedor ? ' (' + esc(g.proveedor) + ')' : '')) + td(money(g.monto), true) + '</tr>';
     }).join('');
     const resumen = (label, value, bold) => '<tr><td style="padding:4px 6px;' + (bold ? 'font-weight:bold;border-top:1.5px solid #333;' : '') + '">' + label + '</td>' +
       '<td style="padding:4px 6px;text-align:right;white-space:nowrap;' + (bold ? 'font-weight:bold;border-top:1.5px solid #333;' : '') + '">' + value + '</td></tr>';
@@ -3024,28 +3173,32 @@
     const bodyHtml =
       '<div style="max-width:720px;margin:0 auto;font-size:10.5pt;">' +
         '<table style="width:100%;border-collapse:collapse;"><tr>' +
-          '<td style="vertical-align:top;"><div style="font-size:16pt;font-weight:bold;letter-spacing:.03em;">ESTADO DE CUENTA</div>' +
+          '<td style="vertical-align:top;"><div style="font-size:16pt;font-weight:bold;letter-spacing:.03em;">LIQUIDACIÓN</div>' +
             '<div style="color:#444;">' + esc(ajuste('despacho') || 'Administración de inmuebles') + ' · ' + esc(fmtPeriodo(periodo)) + ' · ' + esc(f.moneda) + '</div></td>' +
           '<td style="vertical-align:top;text-align:right;color:#444;">Emitido: ' + esc(fmtDate(todayStr())) + '</td>' +
         '</tr></table>' +
         '<div style="margin:16px 0;padding:10px 12px;border:1px solid #999;border-radius:4px;">' +
-          '<b>' + esc(p.nombre) + '</b>' + (p.documento ? ' · ' + esc(p.documento) : '') +
+          '<b>' + esc(edificioNombre(f)) + '</b>' + (f.edificio && f.edificio.direccion ? ' · ' + esc(f.edificio.direccion) : '') +
+          '<br>Propietario: ' + esc(p.nombre) + (p.documento ? ' · ' + esc(p.documento) : '') +
           (p.cuenta ? '<br>Cuenta: ' + esc(p.cuenta) + (p.banco ? ' · ' + esc(p.banco) : '') + (p.titular ? ' · Titular: ' + esc(p.titular) : '') : '') +
-          '<br>Comisión de administración: ' + esc(comisionLabel(p)) +
         '</div>' +
-        '<div style="font-weight:bold;margin:14px 0 4px;">Alquileres cobrados</div>' +
-        (pagosRows ? '<table style="width:100%;border-collapse:collapse;"><tr>' + th('Fecha') + th('Inquilino') + th('Inmueble') + th('Mes') + th('Recibo') + th('Monto', true) + '</tr>' + pagosRows + '</table>' : '<div style="color:#666;">Sin pagos cobrados este mes.</div>') +
-        '<div style="font-weight:bold;margin:18px 0 4px;">Gastos</div>' +
-        (gastosRows ? '<table style="width:100%;border-collapse:collapse;"><tr>' + th('Fecha') + th('Inmueble') + th('Categoría') + th('Concepto') + th('Monto', true) + '</tr>' + gastosRows + '</table>' : '<div style="color:#666;">Sin gastos este mes.</div>') +
-        '<table style="width:340px;margin:20px 0 0 auto;border-collapse:collapse;">' +
+        '<div style="font-weight:bold;margin:14px 0 4px;">Comisión por apartamento</div>' +
+        (unidadesRows ? '<table style="width:100%;border-collapse:collapse;"><tr>' + th('Apartamento') + th('Inquilino') + th('Comisión') + th('Cobrado', true) + th('Monto comisión', true) + '</tr>' + unidadesRows + '</table>' : '<div style="color:#666;">Sin apartamentos con movimientos este mes.</div>') +
+        '<div style="font-weight:bold;margin:18px 0 4px;">Alquileres cobrados</div>' +
+        (pagosRows ? '<table style="width:100%;border-collapse:collapse;"><tr>' + th('Fecha') + th('Inquilino') + th('Apto.') + th('Mes') + th('Recibo') + th('Monto', true) + '</tr>' + pagosRows + '</table>' : '<div style="color:#666;">Sin pagos cobrados este mes.</div>') +
+        (f.descuentaGastos
+          ? '<div style="font-weight:bold;margin:18px 0 4px;">Gastos</div>' +
+            (gastosRows ? '<table style="width:100%;border-collapse:collapse;"><tr>' + th('Fecha') + th('Lugar') + th('Categoría') + th('Concepto') + th('Monto', true) + '</tr>' + gastosRows + '</table>' : '<div style="color:#666;">Sin gastos este mes.</div>')
+          : '') +
+        '<table style="width:360px;margin:20px 0 0 auto;border-collapse:collapse;">' +
           resumen('Total cobrado', money(f.ingresos)) +
           (f.retenciones ? resumen('ISR retenido por inquilinos (crédito fiscal)', '− ' + money(f.retenciones)) : '') +
-          resumen('Gastos', '− ' + money(f.gastos)) +
-          resumen('Comisión de administración', '− ' + money(f.comision)) +
+          (f.descuentaGastos ? resumen('Gastos', '− ' + money(f.gastos)) : '') +
+          resumen('Comisión del abogado', '− ' + money(f.comision)) +
           (f.itbisComision ? resumen('ITBIS de la comisión (' + esc(fmtNumber(ajuste('itbisComision')).replace(/[.,]00$/, '')) + '%)', '− ' + money(f.itbisComision)) : '') +
           resumen(f.neto < 0 ? 'Saldo a cargo del propietario' : 'Saldo a favor del propietario', money(Math.abs(f.neto)), true) +
         '</table>' +
-        (r ? '<div style="margin-top:18px;padding:8px 12px;border:1px solid #999;border-radius:4px;">' + (r.montoTransferido < 0 ? 'Cobrado al propietario' : 'Transferido') + ' el ' + esc(fmtDate(r.fecha)) +
+        (r ? '<div style="margin-top:18px;padding:8px 12px;border:1px solid #999;border-radius:4px;">' + (r.montoTransferido < 0 ? 'Cobrado al propietario' : 'Transferido al propietario') + ' el ' + esc(fmtDate(r.fecha)) +
           ': <b>' + money(Math.abs(r.montoTransferido)) + '</b>' + (r.metodo ? ' · ' + esc(r.metodo) : '') + (r.referencia ? ' · Ref. ' + esc(r.referencia) : '') + '</div>' : '') +
       '</div>';
     return bodyHtml;
@@ -3141,7 +3294,7 @@
       ? '<table class="data-table compact"><thead><tr><th>Inquilino</th><th>Recibido</th><th class="num">Monto</th></tr></thead><tbody>' +
         depositos.map(c => '<tr><td>' + esc(nombresInquilinos(c)) + '<span class="cell-sub">' + esc(unidadLabel(byId(db.unidades, c.unidadId))) + (isActive(c) ? '' : ' · contrato finalizado, falta devolver') + '</span></td>' +
           '<td>' + esc(fmtDate((c.depositoInfo || {}).fechaRecibido)) + '</td><td class="num">' + esc(fmtNumber(c.deposito)) + '</td></tr>').join('') + '</tbody></table>'
-      : emptyState('Sin depósitos en custodia', 'Marca la fecha de recepción en "Depósito…" (menú ⋯ de cada contrato).');
+      : emptyState('Sin depósitos en custodia', 'Se registran en el menú ⋯ del contrato.');
   }
 
   async function exportarExcel(){
@@ -3184,19 +3337,19 @@
           { header:'Ocupación', width:18 }, { header:'Teléfono', width:14 }, { header:'Correo', width:24 }, { header:'Domicilio', width:30 }],
         rows: db.inquilinos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(t => [t.nombre, t.documento, t.nacionalidad, t.estadoCivil, t.ocupacion, t.telefono, t.email, t.direccion]) },
       { name:'Propietarios', columns:[{ header:'Nombre', width:26 }, { header:'Documento', width:15 }, { header:'Teléfono', width:14 }, { header:'Correo', width:24 },
-          { header:'Comisión', width:22 }, { header:'Banco', width:18 }, { header:'Cuenta', width:18 }, { header:'Titular', width:22 }],
-        rows: db.propietarios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => [p.nombre, p.documento, p.telefono, p.email, comisionLabel(p), p.banco, p.cuenta, p.titular]) },
+          { header:'Banco', width:18 }, { header:'Cuenta', width:18 }, { header:'Titular', width:22 }],
+        rows: db.propietarios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => [p.nombre, p.documento, p.telefono, p.email, p.banco, p.cuenta, p.titular]) },
       { name:'Apartamentos', columns:[{ header:'Edificio', width:22 }, { header:'Apartamento', width:12 }, { header:'Piso', type:'number', width:6 }, { header:'Tipo', width:14 },
-          { header:'Propietario', width:24 }, { header:'Renta de referencia', type:'money', width:16 }, { header:'Estado', width:11 }, { header:'Inquilino actual', width:26 }],
+          { header:'Propietario', width:24 }, { header:'Comisión del abogado', width:22 }, { header:'Renta de referencia', type:'money', width:16 }, { header:'Estado', width:11 }, { header:'Inquilino actual', width:26 }],
         rows: db.unidades.slice().sort((a, b) => unidadLabel(a).localeCompare(unidadLabel(b), undefined, { numeric:true })).map(u => {
           const c = activeContractOfUnit(u.id);
-          return [(edificioDe(u) || {}).nombre, u.identificador, u.piso, u.tipo, (propietarioDe(u) || {}).nombre, u.renta, c ? 'Ocupado' : 'Disponible', c ? nombresInquilinos(c) : ''];
+          return [(edificioDe(u) || {}).nombre, u.identificador, u.piso, u.tipo, (propietarioDe(u) || {}).nombre, comisionLabel(comisionDeUnidad(u)), u.renta, c ? 'Ocupado' : 'Disponible', c ? nombresInquilinos(c) : ''];
         }) },
-      { name:'Liquidaciones', columns:[{ header:'Mes', width:14 }, { header:'Propietario', width:24 }, { header:'Moneda', width:8 }, { header:'Cobrado', type:'money', width:14 },
-          { header:'Gastos', type:'money', width:13 }, { header:'Comisión', type:'money', width:13 }, { header:'Neto', type:'money', width:14 }, { header:'Transferido', type:'money', width:14 },
+      { name:'Liquidaciones', columns:[{ header:'Mes', width:14 }, { header:'Edificio', width:22 }, { header:'Propietario', width:24 }, { header:'Moneda', width:8 }, { header:'Cobrado', type:'money', width:14 },
+          { header:'Gastos', type:'money', width:13 }, { header:'Comisión del abogado', type:'money', width:14 }, { header:'ITBIS comisión', type:'money', width:13 }, { header:'Neto propietario', type:'money', width:14 }, { header:'Transferido', type:'money', width:14 },
           { header:'Fecha', type:'date', width:11 }, { header:'Referencia', width:16 }],
         rows: db.liquidaciones.filter(l => enAnio(l.periodo)).sort((a, b) => a.periodo.localeCompare(b.periodo)).map(l =>
-          [fmtPeriodo(l.periodo), (byId(db.propietarios, l.propietarioId) || {}).nombre, l.moneda, l.ingresos, l.gastos, l.comision, l.neto, l.montoTransferido, l.fecha, l.referencia]) },
+          [fmtPeriodo(l.periodo), l.edificioId ? (byId(db.edificios, l.edificioId) || {}).nombre : '', (byId(db.propietarios, l.propietarioId) || {}).nombre, l.moneda, l.ingresos, l.gastos, l.comision, l.itbisComision || 0, l.neto, l.montoTransferido, l.fecha, l.referencia]) },
       { name:'Casos', columns:[{ header:'Caso', width:34 }, { header:'Tipo', width:26 }, { header:'Abierto', type:'date', width:11 }, { header:'Etapa', width:18 },
           { header:'Estado', width:10 }, { header:'Resultado', width:20 }, { header:'Tribunal', width:30 }, { header:'Expediente', width:14 }, { header:'Deuda al abrir', type:'money', width:14 }],
         rows: db.casos.slice().sort((a, b) => (a.abiertoEl || '').localeCompare(b.abiertoEl || '')).map(k =>
@@ -3282,24 +3435,28 @@
   }
 
   // ---------- Estados de cuenta del mes a los propietarios ----------
-  // Todos los propietarios con movimientos en un mes, cada uno con su estado
-  // de cuenta para guardar en PDF y enviar por WhatsApp o correo. Lo enviado
-  // se marca en el propietario (p.estadosEnviados: ['AAAA-MM', ...]).
+  // Todas las liquidaciones de edificio con movimientos en un mes, cada una
+  // para guardar en PDF y enviar al propietario por WhatsApp o correo. Lo
+  // enviado se marca en el propietario (p.estadosEnviados: ['AAAA-MM|edificioId', ...];
+  // los registros viejos, solo 'AAAA-MM', cuentan para todos sus edificios).
   const envioOverlay = $('envioOverlay');
   let envioPeriodo = null;
 
-  function estadoEnviado(p, periodo){ return (p.estadosEnviados || []).includes(periodo); }
+  function estadoEnviado(f, periodo){
+    const enviados = f.propietario.estadosEnviados || [];
+    return enviados.includes(periodo) || enviados.includes(periodo + '|' + f.edificioId);
+  }
   function filasEstados(periodo){
-    return liquidacionesDelMes(periodo).sort((a, b) => a.propietario.nombre.localeCompare(b.propietario.nombre) || a.moneda.localeCompare(b.moneda));
+    return liquidacionesDelMes(periodo).filter(f => !f.anterior).sort(ordenLiq);
   }
   function resumenEstado(f, periodo){
     const p = f.propietario;
     return 'Estimado/a ' + p.nombre + ':\n\n' +
-      'Le compartimos el estado de cuenta de ' + fmtPeriodo(periodo) + (f.moneda ? ' (' + f.moneda + ')' : '') + ':\n' +
+      'Le compartimos la liquidación de ' + edificioNombre(f) + ' de ' + fmtPeriodo(periodo) + (f.moneda ? ' (' + f.moneda + ')' : '') + ':\n' +
       '• Alquileres cobrados: ' + fmtMoney(f.ingresos, f.moneda) + '\n' +
       (f.retenciones ? '• ISR retenido por inquilinos: ' + fmtMoney(f.retenciones, f.moneda) + '\n' : '') +
-      '• Gastos: ' + fmtMoney(f.gastos, f.moneda) + '\n' +
-      '• Comisión de administración: ' + fmtMoney(f.comision, f.moneda) + (f.itbisComision ? ' + ITBIS ' + fmtMoney(f.itbisComision, f.moneda) : '') + '\n' +
+      (f.descuentaGastos ? '• Gastos: ' + fmtMoney(f.gastos, f.moneda) + '\n' : '') +
+      '• Comisión del abogado: ' + fmtMoney(f.comision, f.moneda) + (f.itbisComision ? ' + ITBIS ' + fmtMoney(f.itbisComision, f.moneda) : '') + '\n' +
       '• ' + (f.neto < 0 ? 'Saldo a su cargo: ' : 'Saldo a su favor: ') + fmtMoney(Math.abs(f.neto), f.moneda) + '\n' +
       (f.registro ? (f.registro.montoTransferido < 0 ? 'Cobrado' : 'Transferido') + ' el ' + fmtDate(f.registro.fecha) + '.\n' : '') +
       '\nLe enviamos el detalle en PDF.\n\nAtentamente,\n' + ajuste('firma') + (ajuste('despachoTelefono') ? '\nTel. ' + ajuste('despachoTelefono') : '');
@@ -3307,22 +3464,22 @@
 
   function renderEnvio(){
     const filas = filasEstados(envioPeriodo);
-    $('envioTitulo').textContent = 'Estados de cuenta de ' + fmtPeriodo(envioPeriodo);
-    const enviados = filas.filter(f => estadoEnviado(f.propietario, envioPeriodo)).length;
-    $('envioSub').textContent = filas.length ? plural(filas.length, 'propietario', 'propietarios') + ' con movimientos · ' + enviados + ' enviados' : 'Ningún propietario tiene movimientos este mes.';
+    $('envioTitulo').textContent = 'Liquidaciones de ' + fmtPeriodo(envioPeriodo);
+    const enviados = filas.filter(f => estadoEnviado(f, envioPeriodo)).length;
+    $('envioSub').textContent = filas.length ? plural(filas.length, 'liquidación', 'liquidaciones') + ' con movimientos · ' + enviados + ' enviadas' : 'Ningún edificio tiene movimientos este mes.';
     $('envioTodos').disabled = !filas.length;
     $('envioLista').innerHTML = filas.length ? filas.map(f => {
       const p = f.propietario;
       const key = liqKey(f);
-      const enviado = estadoEnviado(p, envioPeriodo);
+      const enviado = estadoEnviado(f, envioPeriodo);
       return '<div class="lote-fila' + (enviado ? ' enviado' : '') + '">' +
-        '<div class="lote-main"><strong>' + esc(p.nombre) + (f.moneda ? ' · ' + esc(f.moneda) : '') + '</strong><span class="ag-sub">' +
+        '<div class="lote-main"><strong>' + esc(edificioNombre(f)) + ' · ' + esc(p.nombre) + (f.moneda ? ' · ' + esc(f.moneda) : '') + '</strong><span class="ag-sub">' +
           (f.neto < 0 ? 'A su cargo ' : 'A su favor ') + esc(fmtMoney(Math.abs(f.neto), f.moneda)) + (enviado ? ' · <b class="ok-text">Enviado ✓</b>' : '') + '</span></div>' +
         '<button type="button" class="btn-panel" data-envio="pdf" data-id="' + esc(key) + '">PDF</button>' +
         '<button type="button" class="btn-panel" data-envio="correo" data-id="' + esc(key) + '"' + (p.email ? '' : ' disabled title="Sin correo registrado"') + '>Correo</button>' +
         '<button type="button" class="btn-brass" data-envio="wa" data-id="' + esc(key) + '"' + (whatsappNumber(p.telefono) ? '' : ' disabled title="Sin teléfono registrado"') + '>WhatsApp</button>' +
       '</div>';
-    }).join('') : emptyState('Sin movimientos', 'No hay estados de cuenta que enviar para ' + fmtPeriodo(envioPeriodo) + '.');
+    }).join('') : emptyState('Sin movimientos', 'No hay liquidaciones que enviar para ' + fmtPeriodo(envioPeriodo) + '.');
   }
 
   function abrirEnvio(periodo){
@@ -3330,9 +3487,9 @@
     renderEnvio();
     envioOverlay.classList.add('show');
   }
-  async function marcarEnviado(p){
-    if (estadoEnviado(p, envioPeriodo)) return;
-    p.estadosEnviados = (p.estadosEnviados || []).concat(envioPeriodo);
+  async function marcarEnviado(f){
+    if (estadoEnviado(f, envioPeriodo)) return;
+    f.propietario.estadosEnviados = (f.propietario.estadosEnviados || []).concat(envioPeriodo + '|' + f.edificioId);
     await persist();
   }
   $('btnEnvioEstados').addEventListener('click', () => abrirEnvio());
@@ -3341,7 +3498,7 @@
     const filas = filasEstados(envioPeriodo);
     if (!filas.length) return;
     printHtml(filas.map((f, i) => '<div' + (i < filas.length - 1 ? ' style="page-break-after:always;"' : '') + '>' + estadoCuentaHtml(f, envioPeriodo) + '</div>').join(''),
-      'Estados_de_cuenta_' + envioPeriodo, true);
+      'Liquidaciones_' + envioPeriodo, true);
   });
   $('envioLista').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-envio]');
@@ -3352,8 +3509,8 @@
     if (b.dataset.envio === 'pdf') { printHtml(estadoCuentaHtml(f, envioPeriodo), tituloEstadoCuenta(f, envioPeriodo), true); return; }
     const texto = resumenEstado(f, envioPeriodo);
     if (b.dataset.envio === 'wa') window.open('https://wa.me/' + whatsappNumber(p.telefono) + '?text=' + encodeURIComponent(texto), '_blank');
-    else window.open('mailto:' + encodeURIComponent(p.email) + '?subject=' + encodeURIComponent('Estado de cuenta de ' + fmtPeriodo(envioPeriodo)) + '&body=' + encodeURIComponent(texto), '_blank');
-    await marcarEnviado(p);
+    else window.open('mailto:' + encodeURIComponent(p.email) + '?subject=' + encodeURIComponent('Liquidación de ' + edificioNombre(f) + ' · ' + fmtPeriodo(envioPeriodo)) + '&body=' + encodeURIComponent(texto), '_blank');
+    await marcarEnviado(f);
     renderEnvio();
   });
 
@@ -3383,7 +3540,7 @@
     fillBuildingSelect(mntEdificio, 'Todos los edificios');
     const el = $('tableReparaciones');
     if (!db.reparaciones.length) {
-      el.innerHTML = emptyState('Sin solicitudes', 'Registra aquí lo que reportan los inquilinos (filtraciones, averías...) y sigue cada arreglo hasta resolverlo.',
+      el.innerHTML = emptyState('Sin solicitudes', 'Averías que reportan los inquilinos.',
         '<button type="button" class="btn-brass" data-act="nueva-reparacion">+ Nueva solicitud</button>');
       return;
     }
@@ -3419,7 +3576,6 @@
     if (!values.edificioId && db.edificios.length === 1) values.edificioId = db.edificios[0].id;
     openForm({
       title: current ? 'Editar solicitud' : 'Nueva solicitud de reparación',
-      subtitle: 'Al resolverla puedes registrar el costo directamente en Gastos.',
       fields: [
         { name:'edificioId', label:'Edificio', type:'select', required:true, options: db.edificios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(b => ({ value:b.id, label:b.nombre })) },
         { name:'unidadId', label:'¿Dónde?', type:'select', options: unidadOptionsOf(values.edificioId) },
@@ -3671,40 +3827,153 @@
 
   // ---------- Recordatorios en lote ----------
   // Todos los inquilinos con atraso en una lista, cada uno con su mensaje
-  // listo para WhatsApp o correo. WhatsApp no permite envíos automáticos:
-  // cada botón abre el chat con el texto y se anota en el seguimiento.
+  // listo. "Enviar a todos" manda los correos solo (con la cuenta de
+  // Configuración → Correo para recordatorios) y luego guía los WhatsApp
+  // uno a uno: WhatsApp no permite envíos automáticos, así que cada chat se
+  // abre con el texto y basta pulsar Enter aquí para pasar al siguiente.
+  // Todo envío se anota en el seguimiento del inquilino.
   const loteOverlay = $('loteOverlay');
-  const loteEnviados = new Map(); // contratoId -> 'WhatsApp' | 'correo' (en esta sesión)
+  const loteEnviados = new Map(); // contratoId -> { correo, wa, error } (en esta sesión)
+  let loteCola = null;            // WhatsApp guiado: { ids:[contratoId], i }
+  let loteOcupado = false;
 
   function deudoresActuales(){
     return db.contratos.map(c => ({ c, d: deudaDe(c), t: inquilinosDe(c)[0] }))
       .filter(x => x.d.monto > 0 && x.t)
       .sort((a, b) => b.d.meses - a.d.meses || b.d.monto - a.d.monto);
   }
+  function estadoLote(id){
+    if (!loteEnviados.has(id)) loteEnviados.set(id, {});
+    return loteEnviados.get(id);
+  }
+  function setEstadoLote(html){ $('loteEstado').innerHTML = html; }
 
   function renderLote(){
     const lista = deudoresActuales();
     const conWa = lista.filter(x => whatsappNumber(x.t.telefono)).length;
     $('loteSub').textContent = plural(lista.length, 'inquilino con pagos atrasados', 'inquilinos con pagos atrasados') + ' · ' +
       conWa + ' con WhatsApp · ' + lista.filter(x => x.t.email).length + ' con correo';
+    $('loteTodos').disabled = !lista.length || loteOcupado || !!loteCola;
+    const actual = loteCola ? loteCola.ids[loteCola.i] : null;
     $('loteLista').innerHTML = lista.length ? lista.map(({ c, d, t }) => {
-      const enviado = loteEnviados.get(c.id);
-      return '<div class="lote-fila' + (enviado ? ' enviado' : '') + '">' +
+      const e = loteEnviados.get(c.id) || {};
+      const hechos = [e.correo && 'correo', e.wa && 'WhatsApp'].filter(Boolean);
+      return '<div class="lote-fila' + (hechos.length ? ' enviado' : '') + (c.id === actual ? ' actual' : '') + '">' +
         '<div class="lote-main"><strong>' + esc(t.nombre) + '</strong><span class="ag-sub">' + esc(unidadLabel(byId(db.unidades, c.unidadId))) + ' · debe ' + esc(fmtMoney(d.monto, c.moneda)) +
-          ' (' + plural(d.meses, 'mes', 'meses') + ')' + (enviado ? ' · <b class="ok-text">Enviado por ' + esc(enviado) + ' ✓</b>' : '') + '</span></div>' +
+          ' (' + plural(d.meses, 'mes', 'meses') + ')' + (hechos.length ? ' · <b class="ok-text">Enviado por ' + esc(hechos.join(' y ')) + ' ✓</b>' : '') +
+          (e.error ? ' · <span class="lote-error">' + esc(e.error) + '</span>' : '') + '</span></div>' +
         '<button type="button" class="btn-panel" data-lote="ver" data-id="' + esc(c.id) + '">Ver mensaje</button>' +
         '<button type="button" class="btn-panel" data-lote="correo" data-id="' + esc(c.id) + '"' + (t.email ? '' : ' disabled title="Sin correo registrado"') + '>Correo</button>' +
         '<button type="button" class="btn-brass" data-lote="wa" data-id="' + esc(c.id) + '"' + (whatsappNumber(t.telefono) ? '' : ' disabled title="Sin teléfono registrado"') + '>WhatsApp</button>' +
       '</div>';
     }).join('') : emptyState('Nadie tiene pagos atrasados', 'No hay recordatorios que enviar.');
+    renderGuia();
+  }
+
+  function abrirWhatsApp(c, t){
+    window.open('https://wa.me/' + whatsappNumber(t.telefono) + '?text=' + encodeURIComponent(textoRecordatorio(c)), '_blank');
+    estadoLote(c.id).wa = true;
+    registrarSeguimiento(t.id, 'Recordatorio de pago enviado por WhatsApp (envío en lote).');
+  }
+  function abrirCorreo(c, t){
+    window.open('mailto:' + encodeURIComponent(t.email) + '?subject=' + encodeURIComponent('Recordatorio de pago de alquiler') + '&body=' + encodeURIComponent(textoRecordatorio(c)), '_blank');
+    estadoLote(c.id).correo = true;
+    registrarSeguimiento(t.id, 'Recordatorio de pago enviado por correo (envío en lote).');
+  }
+
+  // ---- Enviar a todos ----
+  async function enviarATodos(){
+    if (loteOcupado || loteCola) return;
+    const lista = deudoresActuales();
+    const correoListo = !!(window.rcCorreo && (await window.rcCorreo.status()).configured);
+    const porCorreo = correoListo ? lista.filter(x => x.t.email && !estadoLote(x.c.id).correo) : [];
+    let correosOk = 0, correosFallidos = 0;
+    if (porCorreo.length) {
+      loteOcupado = true;
+      renderLote();
+      setEstadoLote('Enviando correos… 0 de ' + porCorreo.length);
+      const r = await window.rcCorreo.enviarLote(porCorreo.map(({ c, t }) => ({
+        id: c.id, to: t.email, subject: 'Recordatorio de pago de alquiler', text: textoRecordatorio(c)
+      })), (p) => {
+        const e = estadoLote(p.resultado.id);
+        if (p.resultado.ok) { e.correo = true; e.error = null; } else e.error = p.resultado.error;
+        setEstadoLote('Enviando correos… ' + p.hecho + ' de ' + p.total);
+        renderLote();
+      });
+      for (const res of (r.resultados || [])) {
+        const x = porCorreo.find(y => y.c.id === res.id);
+        if (res.ok) { correosOk++; estadoLote(res.id).correo = true; if (x) await registrarSeguimiento(x.t.id, 'Recordatorio de pago enviado por correo automático (envío a todos).'); }
+        else correosFallidos++;
+      }
+      loteOcupado = false;
+      if (!r.ok && r.error) {
+        setEstadoLote('<span class="lote-error">' + esc(r.error) + '</span>');
+        renderLote();
+        if (!(r.resultados || []).length) return;
+      }
+    }
+    // WhatsApp guiado: a quien tiene número y no lo recibió aún (y, salvo que
+    // se marque la casilla, a quien no recibió el correo).
+    const waTambien = $('loteWaTambien').checked;
+    const ids = lista.filter(x => whatsappNumber(x.t.telefono) && !estadoLote(x.c.id).wa && (waTambien || !estadoLote(x.c.id).correo)).map(x => x.c.id);
+    const resumen = [];
+    if (correosOk) resumen.push(plural(correosOk, 'correo enviado', 'correos enviados'));
+    if (correosFallidos) resumen.push('<span class="lote-error">' + plural(correosFallidos, 'correo falló', 'correos fallaron') + '</span>');
+    const sinCorreo = !correoListo && lista.some(x => x.t.email);
+    if (sinCorreo) resumen.push('correo sin configurar: <button type="button" class="link-btn" data-correo-open>Configurar</button>');
+    if (ids.length) {
+      loteCola = { ids, i: 0, resumen };
+      renderLote();
+      $('loteGuiaAbrir').focus();
+    } else {
+      const sinCanal = lista.filter(x => !estadoLote(x.c.id).correo && !estadoLote(x.c.id).wa && !whatsappNumber(x.t.telefono) && !x.t.email).length;
+      if (sinCanal) resumen.push(plural(sinCanal, 'inquilino sin teléfono ni correo', 'inquilinos sin teléfono ni correo'));
+      setEstadoLote(resumen.length ? resumen.join(' · ') : 'Ya se envió a todos.');
+      renderLote();
+    }
+  }
+
+  function renderGuia(){
+    const guia = $('loteGuia');
+    if (!loteCola) { guia.hidden = true; return; }
+    const c = byId(db.contratos, loteCola.ids[loteCola.i]);
+    const t = c && inquilinosDe(c)[0];
+    guia.hidden = false;
+    $('loteGuiaPaso').textContent = 'WhatsApp ' + (loteCola.i + 1) + ' de ' + loteCola.ids.length;
+    $('loteGuiaNombre').textContent = t ? t.nombre + ' · ' + unidadLabel(byId(db.unidades, c.unidadId)) : '—';
+    setEstadoLote((loteCola.resumen.length ? loteCola.resumen.join(' · ') + ' · ' : '') + 'Envía el mensaje en WhatsApp y vuelve aquí.');
+  }
+  function avanzarGuia(abrir){
+    if (!loteCola) return;
+    const c = byId(db.contratos, loteCola.ids[loteCola.i]);
+    const t = c && inquilinosDe(c)[0];
+    if (abrir && c && t) abrirWhatsApp(c, t);
+    loteCola.i++;
+    if (loteCola.i >= loteCola.ids.length) terminarGuia();
+    else { renderLote(); $('loteGuiaAbrir').focus(); }
+  }
+  function terminarGuia(){
+    if (!loteCola) return;
+    const enviados = loteCola.ids.filter(id => estadoLote(id).wa).length;
+    const resumen = loteCola.resumen.concat(plural(enviados, 'WhatsApp abierto', 'WhatsApp abiertos'));
+    loteCola = null;
+    setEstadoLote('Listo: ' + resumen.join(' · ') + '.');
+    renderLote();
   }
 
   function abrirLote(){
+    setEstadoLote('');
     renderLote();
     loteOverlay.classList.add('show');
   }
   $('btnLote').addEventListener('click', abrirLote);
-  $('loteClose').addEventListener('click', () => loteOverlay.classList.remove('show'));
+  $('loteClose').addEventListener('click', () => { loteCola = null; loteOverlay.classList.remove('show'); });
+  $('loteTodos').addEventListener('click', enviarATodos);
+  $('loteGuiaAbrir').addEventListener('click', () => avanzarGuia(true));
+  $('loteGuiaSaltar').addEventListener('click', () => avanzarGuia(false));
+  $('loteGuiaDetener').addEventListener('click', terminarGuia);
+  // Al volver de WhatsApp, Enter abre el siguiente chat.
+  window.addEventListener('focus', () => { if (loteCola && loteOverlay.classList.contains('show')) $('loteGuiaAbrir').focus(); });
   $('loteLista').addEventListener('click', (e) => {
     const b = e.target.closest('[data-lote]');
     if (!b) return;
@@ -3712,17 +3981,69 @@
     const t = c && inquilinosDe(c)[0];
     if (!t) return;
     if (b.dataset.lote === 'ver') { openRecordatorio(c.id); return; }
-    const texto = textoRecordatorio(c);
-    if (b.dataset.lote === 'wa') {
-      window.open('https://wa.me/' + whatsappNumber(t.telefono) + '?text=' + encodeURIComponent(texto), '_blank');
-      loteEnviados.set(c.id, 'WhatsApp');
-      registrarSeguimiento(t.id, 'Recordatorio de pago enviado por WhatsApp (envío en lote).');
-    } else {
-      window.open('mailto:' + encodeURIComponent(t.email) + '?subject=' + encodeURIComponent('Recordatorio de pago de alquiler') + '&body=' + encodeURIComponent(texto), '_blank');
-      loteEnviados.set(c.id, 'correo');
-      registrarSeguimiento(t.id, 'Recordatorio de pago enviado por correo (envío en lote).');
-    }
+    if (b.dataset.lote === 'wa') abrirWhatsApp(c, t);
+    else abrirCorreo(c, t);
     renderLote();
+  });
+
+  // ---------- Correo para recordatorios (Configuración) ----------
+  const correoOverlay = $('correoOverlay');
+  const PROVEEDORES_CORREO = { gmail: { host:'smtp.gmail.com', port:465 }, yahoo: { host:'smtp.mail.yahoo.com', port:465 } };
+
+  function proveedorDe(host){ return Object.keys(PROVEEDORES_CORREO).find(k => PROVEEDORES_CORREO[k].host === host) || (host ? 'otro' : 'gmail'); }
+  function syncProveedorCorreo(){
+    const otro = $('correoProveedor').value === 'otro';
+    $('correoServidor').hidden = !otro;
+    $('correoAyudaGmail').hidden = $('correoProveedor').value !== 'gmail';
+  }
+  async function renderCorreo(){
+    const st = await window.rcCorreo.status();
+    $('correoEstado').textContent = st.configured ? 'Configurado: ' + st.user : 'Sin configurar.';
+    $('correoEstado').classList.toggle('ok', st.configured);
+    $('correoProveedor').value = proveedorDe(st.host);
+    $('correoHost').value = st.host;
+    $('correoPuerto').value = st.port || 465;
+    $('correoUsuario').value = st.user;
+    $('correoNombre').value = st.nombre || ajuste('despacho') || '';
+    $('correoPass').value = '';
+    $('correoPass').placeholder = st.configured ? 'Guardada (escribe otra para cambiarla)' : 'xxxx xxxx xxxx xxxx';
+    $('correoQuitar').hidden = !st.configured;
+    $('correoProbar').disabled = !st.configured;
+    syncProveedorCorreo();
+  }
+  async function abrirCorreoConfig(){
+    if (!window.rcCorreo) { await ui.showNotice('Disponible solo en la aplicación de escritorio.', 'Correo'); return; }
+    $('correoPrueba').textContent = '';
+    await renderCorreo();
+    correoOverlay.classList.add('show');
+    $('correoUsuario').focus();
+  }
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-correo-open]')) abrirCorreoConfig(); });
+  $('correoProveedor').addEventListener('change', syncProveedorCorreo);
+  $('correoCerrar').addEventListener('click', () => { correoOverlay.classList.remove('show'); if (activeView === 'configuracion') renderConfiguracion(); });
+  $('correoGmailLink').addEventListener('click', () => window.open('https://myaccount.google.com/apppasswords', '_blank'));
+  $('correoGuardar').addEventListener('click', async () => {
+    const prov = PROVEEDORES_CORREO[$('correoProveedor').value];
+    const r = await window.rcCorreo.set({
+      host: prov ? prov.host : $('correoHost').value, port: prov ? prov.port : Number($('correoPuerto').value),
+      user: $('correoUsuario').value, pass: $('correoPass').value, nombre: $('correoNombre').value
+    });
+    if (!r.ok) { $('correoPrueba').innerHTML = '<span class="lote-error">' + esc(r.error) + '</span>'; return; }
+    await renderCorreo();
+    $('correoPrueba').textContent = 'Guardado. Pulsa "Probar" para enviarte un correo de prueba.';
+  });
+  $('correoProbar').addEventListener('click', async () => {
+    $('correoProbar').disabled = true;
+    $('correoPrueba').textContent = 'Enviando correo de prueba…';
+    const r = await window.rcCorreo.test();
+    $('correoProbar').disabled = false;
+    $('correoPrueba').innerHTML = r.ok ? '<span class="ok-text">' + esc(r.mensaje) + '</span>' : '<span class="lote-error">' + esc(r.error) + '</span>';
+  });
+  $('correoQuitar').addEventListener('click', async () => {
+    if (!(await ui.showConfirmDialog('¿Quitar la cuenta de correo? Los recordatorios volverán a abrirse en tu programa de correo.', 'Quitar correo'))) return;
+    await window.rcCorreo.remove();
+    $('correoPrueba').textContent = '';
+    await renderCorreo();
   });
 
   // ---------- Búsqueda global (Ctrl+K) ----------
@@ -3739,7 +4060,7 @@
     const coincide = (...campos) => { const h = normalize(campos.filter(Boolean).join(' ')); return palabras.every(w => h.includes(w)) || (/\d{3,}/.test(q) && claveDocumento(campos.join(' ')).includes(claveDocumento(q))); };
     const out = [];
     db.inquilinos.forEach(t => { if (coincide(t.nombre, t.documento, t.telefono, t.email)) out.push({ tipo:'Inquilino', titulo:t.nombre, sub:[t.documento, t.telefono].filter(Boolean).join(' · '), abrir: () => openTenantDetail(t.id) }); });
-    db.propietarios.forEach(p => { if (coincide(p.nombre, p.documento, p.telefono, p.email)) out.push({ tipo:'Propietario', titulo:p.nombre, sub:[p.documento, comisionLabel(p)].filter(Boolean).join(' · '), abrir: () => openPropietarioForm(p.id) }); });
+    db.propietarios.forEach(p => { if (coincide(p.nombre, p.documento, p.telefono, p.email)) out.push({ tipo:'Propietario', titulo:p.nombre, sub:[p.documento, p.telefono].filter(Boolean).join(' · '), abrir: () => openPropietarioForm(p.id) }); });
     db.edificios.forEach(b => { if (coincide(b.nombre, b.direccion)) out.push({ tipo:'Edificio', titulo:b.nombre, sub:b.direccion || '', abrir: () => ACTIONS['ver-unidades'](b.id) }); });
     db.unidades.forEach(u => {
       if (!coincide(unidadLabel(u), u.tipo)) return;
@@ -3769,6 +4090,7 @@
     if (sel) sel.scrollIntoView({ block:'nearest' });
   }
   function abrirBusqueda(){
+    if (soloRedactor()) return; // busca en datos de gestión
     buscarInput.value = '';
     buscarSel = 0;
     renderBusqueda();
@@ -3932,7 +4254,7 @@
   function renderCasos(){
     const el = $('tableCasos');
     if (!db.casos.length) {
-      el.innerHTML = emptyState('Sin casos', 'Abre un caso desde un contrato con pagos atrasados (menú "⋯" → "Abrir caso de cobro…") o con el botón de arriba.',
+      el.innerHTML = emptyState('Sin casos', 'Ábrelo desde un contrato con deuda (menú ⋯) o aquí arriba.',
         '<button type="button" class="btn-brass" data-act="nuevo-caso">+ Nuevo caso</button>');
       return;
     }
@@ -4095,7 +4417,7 @@
       fields: [
         { name:'fecha', label:'Fecha', type:'date', required:true },
         { name:'nota', label:'Detalle', type:'textarea', full:true, placeholder: etapa === 'intimacion' ? 'Acto núm..., notificado por...' : etapa === 'demanda' ? 'Demanda depositada en...' : 'Qué ocurrió' },
-        { name:'_prox', type:'heading', label:'Próxima fecha', help:'Opcional. Se añade a la agenda.' },
+        { name:'_prox', type:'heading', label:'Próxima fecha', help:'Opcional.' },
         { name:'proxFecha', label:'Fecha', type:'date' },
         { name:'proxHora', label:'Hora', type:'time' },
         { name:'proxTipo', label:'Tipo', type:'select', options:TIPOS_EVENTO },
@@ -4325,7 +4647,6 @@
     const casos = db.casos.filter(k => casoAbierto(k) || (current && current.casoId === k.id));
     openForm({
       title: current ? 'Editar evento' : 'Nuevo evento',
-      subtitle: 'Audiencias, plazos, citas o tareas. Lo pendiente se avisa al abrir la aplicación.',
       fields: [
         { name:'titulo', label:'Descripción', required:true, full:true, placeholder:'Ej: Audiencia de conocimiento' },
         { name:'tipo', label:'Tipo', type:'select', options:TIPOS_EVENTO },
@@ -4402,6 +4723,11 @@
     const recortado = document.documentElement.classList.contains('nav-collapsed');
     cfgView.querySelectorAll('[data-cfg-menu]').forEach(b => b.classList.toggle('active', (b.dataset.cfgMenu === 'recortado') === recortado));
     renderApariencia();
+    const edificios = db.edificios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+    $('cfgLiqEdificios').innerHTML = edificios.length
+      ? edificios.map(b => '<label class="cfg-check"><input type="checkbox" data-cfg-gastos="' + esc(b.id) + '"' + (descuentaGastos(b) ? ' checked' : '') + '> ' +
+          esc(b.nombre) + ': descontar gastos <span class="muted">(comisión: ' + esc(comisionLabel(b)) + ')</span></label>').join('')
+      : '<span class="muted">Todavía no hay edificios.</span>';
     $('cfgVersion').textContent = window.rcApp && window.rcApp.version ? 'R' + window.rcApp.version : '';
 
     let pin = null;
@@ -4411,11 +4737,15 @@
       : 'Desactivado: cualquiera con acceso al equipo puede abrir la aplicación.';
 
     // Estados que vienen del proceso principal (si no existe, fuera de Electron).
-    const [carpeta, respaldo, didit] = await Promise.all([
+    const [carpeta, respaldo, didit, correo] = await Promise.all([
       window.rcFiles ? window.rcFiles.getFolder() : null,
       window.rcBackup ? window.rcBackup.status() : null,
-      window.rcDidit ? window.rcDidit.status() : null
+      window.rcDidit ? window.rcDidit.status() : null,
+      window.rcCorreo ? window.rcCorreo.status() : null
     ]);
+    $('cfgCorreo').textContent = correo && correo.configured
+      ? 'Activado · los recordatorios salen desde ' + correo.user
+      : 'Sin configurar: los recordatorios por correo se abren en tu programa de correo.';
     $('cfgCarpeta').textContent = carpeta && carpeta.path ? carpeta.path + (carpeta.exists ? '' : ' (no encontrada)') : 'Sin elegir: aquí van los contratos, modelos, expedientes y respaldos.';
     $('cfgCarpeta').title = carpeta && carpeta.path ? carpeta.path : '';
     $('cfgRespaldo').textContent = respaldo
@@ -4428,6 +4758,14 @@
   }
 
   cfgView.addEventListener('change', async (e) => {
+    const gastosEl = e.target.closest('[data-cfg-gastos]');
+    if (gastosEl) {
+      const b = byId(db.edificios, gastosEl.dataset.cfgGastos);
+      if (!b) return;
+      b.descontarGastos = gastosEl.checked;
+      if (await persist()) { mostrarGuardado(); renderNavCounts(); }
+      return;
+    }
     const el = e.target.closest('[data-ajuste]');
     if (!el) return;
     let valor = el.value.trim();
@@ -4973,7 +5311,7 @@
     'editar-propietario': (id) => openPropietarioForm(id),
     'borrar-propietario': deletePropietario,
     'ver-liquidacion': (id, btn) => {
-      if (btn.dataset.periodo) liqMes.value = btn.dataset.periodo;
+      if (btn.dataset.periodo) { liqMes.value = btn.dataset.periodo; setLiqModo('mes'); }
       liqPropFiltro = id || '';
       showView('liquidaciones');
     },
@@ -5070,6 +5408,7 @@
     let start = 'resumen';
     try { start = localStorage.getItem(VIEW_KEY) || 'resumen'; } catch (err) { /* no crítico */ }
     aplicarPapelRedactor();
+    aplicarPlan(planLicencia);
     showView(start);
     refreshBackupStatus();
     avisarAgenda();

@@ -43,21 +43,26 @@ inmuebles que administra el despacho:
   internet, limpieza, seguridad...), con proveedor y número de factura. "Repetir"
   copia un gasto con la fecha de hoy, útil para servicios mensuales.
 - **Propietarios y Liquidaciones**: cada edificio tiene un propietario (y un
-  apartamento puede tener otro distinto), con su comisión de administración
-  (porcentaje de lo cobrado o monto fijo mensual) y su cuenta bancaria. Cada mes,
-  Liquidaciones calcula por propietario y moneda: lo cobrado − los gastos de sus
-  inmuebles − la comisión = lo que hay que transferirle. Se registra la
-  transferencia (queda una foto de los importes y se avisa si después cambian) y se
-  imprime su **estado de cuenta** con el detalle de pagos y gastos.
+  apartamento puede tener otro distinto) con su cuenta bancaria. Las liquidaciones
+  son del abogado: cada edificio lleva la **comisión del abogado** (porcentaje de lo
+  cobrado o monto fijo por apartamento alquilado), y un apartamento puede tener una
+  propia que reemplaza la del edificio. Cada mes, Liquidaciones calcula por edificio,
+  propietario y moneda la comisión de cada apartamento y lo que queda para el
+  propietario: lo cobrado − la comisión (− los gastos, si ese edificio los descuenta;
+  se elige por edificio en Configuración). Se registra la liquidación (queda una foto
+  de los importes y se avisa si después cambian) y se imprime con el desglose por
+  apartamento, los pagos y los gastos.
 - **Balance**: ingresos cobrados frente a gastos por mes, por año, moneda y
   edificio, con gastos por categoría. Los ingresos se cuentan por la fecha en que se
   cobró el pago. Los montos nunca se mezclan entre monedas.
 
+**Ayuda** (botón "?" de la barra superior): recorrido interactivo por toda la aplicación (menos Configuración), completo, de la pantalla actual o por sección. La interfaz casi no lleva textos de explicación: la ayuda es el recorrido.
+
 **Configuración** (al pie del menú lateral): apariencia (preferencias de este equipo: tema oscuro, claro o según Windows; color de acento; tamaño de la interfaz de 90% a 125%; densidad cómoda o compacta; fuente; animaciones; menú completo o recortado; y "Restablecer"); datos del
 despacho, que aparecen en recibos, estados de cuenta y recordatorios; valores predeterminados
-(moneda, día de pago, duración de los contratos, recargo por mora, comisión de propietarios
-nuevos, aviso de vencimiento, papel de impresión), que se guardan con los datos y entran en
-los respaldos; carpeta de trabajo, respaldos, verificación con la JCE, PIN y actualizaciones.
+(moneda, día de pago, duración de los contratos, recargo por mora, comisión del abogado en
+edificios nuevos, aviso de vencimiento, papel de impresión), que se guardan con los datos y entran en
+los respaldos; qué edificios descuentan los gastos en su liquidación; carpeta de trabajo, respaldos, verificación con la JCE, PIN y actualizaciones.
 
 **Ciclo del contrato** (menú "⋯" de cada contrato):
 
@@ -124,7 +129,11 @@ con las flechas y Enter se abre la ficha.
 
 **Recordatorios en lote** (Cobros → "Recordar a los atrasados"): todos los inquilinos con
 atraso, cada uno con su mensaje listo para WhatsApp o correo; cada envío se marca y se anota
-en el seguimiento. (WhatsApp no permite envíos automáticos: cada botón abre el chat.)
+en el seguimiento. **"Enviar a todos"** manda los correos solos (con la cuenta de Configuración →
+"Correo para recordatorios"; en Gmail, una contraseña de aplicación, guardada cifrada) y luego
+abre los WhatsApp uno tras otro: se envía en WhatsApp, se vuelve y Enter abre el siguiente.
+WhatsApp no permite envíos automáticos sin la API de pago de Meta. Nadie recibe dos veces lo mismo
+en la misma sesión.
 
 **Aumento del alquiler**: en el contrato, "Aumento anual (%)" y cada cuántos meses. El Resumen
 y la Agenda avisan antes del aniversario, y "Aplicar aumento…" (menú del contrato) guarda el
@@ -135,11 +144,11 @@ inquilino.
 cada cuota) y "Retención de ISR del inquilino (%)" (empresas que retienen ISR: al registrar el
 pago se propone lo retenido, que cuenta como pagado). En las liquidaciones el ISR retenido se
 muestra aparte y no se transfiere, y en Configuración se puede indicar el ITBIS sobre la
-comisión del despacho. Los porcentajes los decide el usuario; conviene confirmarlos con el
+comisión del abogado. Los porcentajes los decide el usuario; conviene confirmarlos con el
 contador.
 
-**Estados de cuenta del mes** (Liquidaciones → "Enviar estados de cuenta"): uno por
-propietario, para guardar en PDF o enviar un resumen por WhatsApp o correo; "Todos en un PDF"
+**Liquidaciones del mes a los propietarios** (Liquidaciones → "Enviar a propietarios"): una por
+edificio y propietario, para guardar en PDF o enviar un resumen por WhatsApp o correo; "Todos en un PDF"
 los junta. En los primeros 10 días del mes el Resumen avisa de los que faltan por enviar.
 
 **Mantenimiento**: solicitudes de reparación por apartamento o áreas comunes, con prioridad,
@@ -176,11 +185,18 @@ modelos que versiones anteriores guardaban dentro de la app se mueven solos a
 lateral (se puede ocultar) tiene tres pestañas: Documentos, Modelos y Campos. En
 Campos, los campos repetidos se agrupan (×N); al editar uno se puede aplicar el
 valor a todos los del mismo nombre, y los que faltan por completar se marcan. La
-página se muestra a su tamaño real (Carta, A4, Oficio...; vertical u horizontal)
-con guías de salto de página, y el pie indica palabras y páginas, con zoom y
-"Ajustar" al ancho. La barra de formato incluye estilos de párrafo, tachado,
-justificado, sangría, quitar formato y salto de página. Atajos: Ctrl+S guarda el
-`.doc` y Ctrl+P imprime.
+documento se ve **como en Word: hojas separadas** del tamaño real del papel (Carta,
+A4, Oficio...; vertical u horizontal) con los **márgenes** elegidos en el pie
+(estrechos, moderados, 2 cm, los de Word o amplios). Un párrafo que no cabe pasa
+entero a la hoja siguiente, y al imprimir, en el PDF y en el `.doc` se usan el
+mismo papel, márgenes, tipografía y regla, así que cada hoja sale como se ve. El pie
+indica palabras y páginas, con zoom y "Ajustar" al ancho. La barra de formato incluye
+estilos de párrafo, tachado, justificado, sangría, quitar formato, salto de página e
+**interlineado**: 1,0 a 3,0, "Juntar/Separar líneas" de a 0,1, espacio entre
+párrafos (ninguno, pequeño, normal, amplio) y "Quitar líneas vacías" (renglones en
+blanco y saltos dobles), para lo seleccionado o todo el documento. Atajos: Ctrl+S
+guarda el `.doc`, Ctrl+P imprime, y Ctrl+1 / Ctrl+5 / Ctrl+2 ponen interlineado
+sencillo, 1,5 o doble.
 
 **Documento del contrato**: desde un contrato, "Redactar" abre el redactor con un
 modelo guardado y rellena solos los campos cuyo nombre coincide con un dato del
@@ -196,6 +212,26 @@ diario** en `<carpeta de trabajo>\Respaldos` (se conservan 30 días; si aún no 
 carpeta de trabajo, en la carpeta de datos de la app). Su estado se ve al pie del menú
 lateral, y cualquiera de ellos se restaura con "Importar respaldo". "Exportar respaldo" descarga todo
 en un archivo JSON, e "Importar respaldo" lo restaura (reemplaza los datos actuales).
+
+## Licencias y planes
+
+Cada licencia tiene un plan: **completo** (toda la aplicación) o **redactor** (solo el
+redactor de contratos y Configuración, sin nada de gestión). El servidor de licencias
+(`servidor-licencias/worker.js`, un Cloudflare Worker) devuelve el plan firmado con
+Ed25519 y la app lo comprueba con `licencia-publica.pem`, así que no se puede cambiar
+editando nada en el equipo del cliente. Sin internet, la app abre con el último plan
+firmado durante 12 horas.
+
+- **Alta:** en Workers KV, clave = la licencia; valor `{}` (completo) o
+  `{"plan":"redactor"}`.
+- **Cambiar de plan:** edita su valor y añade o cambia `"plan"` sin borrar su
+  `deviceId`. Se aplica la próxima vez que abra el programa.
+- **Claves de firma:** `node servidor-licencias/generar-claves.js` (una sola vez).
+  La privada va como secreto `LICENSE_SIGNING_KEY` del Worker y no se sube a git.
+- **Orden al publicar:** primero el Worker nuevo; después la app. La app nueva rechaza
+  respuestas sin firma.
+
+Las herramientas de desarrollo (Ctrl+Shift+I) solo se abren sin empaquetar.
 
 ## Requisitos
 

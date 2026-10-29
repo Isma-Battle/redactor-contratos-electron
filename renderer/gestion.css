@@ -745,6 +745,36 @@ html[data-theme="light"]{--desk-bg:#E3E6EC; --page-break:color-mix(in srgb, var(
 }
 .editor-formatbar .fmt-pill:hover:not(:disabled){background:var(--accent); color:var(--accent-contrast);}
 .editor-formatbar .fmt-pill:disabled{background:transparent; color:var(--text-muted); border-color:var(--border);}
+/* Menú de interlineado (fijo, bajo su botón: la barra puede tener scroll) */
+.fmt-menu{
+  position:fixed; z-index:80; width:264px; padding:10px;
+  border:1px solid var(--border-strong); border-radius:10px;
+  background:var(--surface-raised); color:var(--text);
+  box-shadow:0 14px 36px rgba(0,0,0,.28);
+  font:500 .8rem var(--font-ui);
+}
+.fmt-menu-title{margin:6px 2px 6px; font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.fmt-menu-title:first-child{margin-top:0;}
+.fmt-menu-grid{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:4px;}
+.fmt-menu-grid.dos{grid-template-columns:repeat(2, minmax(0,1fr));}
+.fmt-menu button{
+  height:30px; padding:0 8px;
+  border:1px solid var(--border); border-radius:6px;
+  background:var(--surface); color:var(--text);
+  font:600 .78rem var(--font-ui); font-variant-numeric:tabular-nums;
+}
+.fmt-menu button:hover{border-color:var(--accent); color:var(--accent);}
+.fmt-menu button.active{background:var(--highlight); border-color:var(--accent); color:var(--accent);}
+.fmt-menu-fino{display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:4px;}
+.fmt-menu-sep{height:1px; margin:10px 0 8px; background:var(--border);}
+.fmt-menu .fmt-menu-accion{
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  width:100%; height:auto; padding:7px 9px; text-align:left;
+}
+.fmt-menu .fmt-menu-accion span{font-size:.7rem; font-weight:400; color:var(--text-muted);}
+.fmt-menu-check{display:flex; align-items:center; gap:7px; margin-top:9px; font-size:.78rem; cursor:pointer;}
+.fmt-menu-check input{width:15px; height:15px; accent-color:var(--accent);}
+.fmt-menu-nota{margin-top:6px; font-size:.72rem; color:var(--accent); min-height:1em;}
 
 .rd-desk{
   flex:1; min-height:0; overflow:auto;
@@ -752,28 +782,38 @@ html[data-theme="light"]{--desk-bg:#E3E6EC; --page-break:color-mix(in srgb, var(
   padding:28px 32px 56px;
   background:var(--desk-bg);
 }
-/* La página: tamaño real del papel, márgenes de 2 cm como al imprimir y
-   una línea donde termina cada página. */
+/* Las hojas: tamaño real del papel y los mismos márgenes que al imprimir.
+   El editor es un solo bloque; el fondo lo dibuja como hojas separadas por
+   un hueco (--page-gap) y el paginado del redactor empuja cada párrafo que
+   no cabe al principio de la hoja siguiente (.pag-salto), como Word. */
 .rd-desk .paper{
+  --margen:2cm;
+  --page-gap:24px;
   flex:0 0 auto;
   width:var(--page-w, 8.5in);
   max-width:none;
   min-height:var(--page-h, 11in);
-  padding:2cm;
+  padding:var(--margen);
   border:0;
-  border-radius:2px;
+  border-radius:0;
+  font-family:'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-size:12pt;
   line-height:1.6;
-  background-color:var(--paper);
+  background-color:transparent;
   background-image:repeating-linear-gradient(to bottom,
-    transparent 0, transparent calc(var(--page-h, 11in) - 1px),
-    var(--page-break) calc(var(--page-h, 11in) - 1px), var(--page-break) var(--page-h, 11in));
-  box-shadow:0 8px 28px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.06);
+    var(--paper) 0, var(--paper) var(--page-h, 11in),
+    var(--desk-bg) var(--page-h, 11in), var(--desk-bg) calc(var(--page-h, 11in) + var(--page-gap)));
+  box-shadow:none;
 }
-.rd-desk .paper:focus{box-shadow:0 8px 28px rgba(0,0,0,.28), 0 0 0 3px var(--focus);}
+.rd-desk .paper:focus{box-shadow:none; outline:none;}
+.rd-desk .paper .pag-salto{padding-top:var(--pag) !important;}
+/* Los campos se resaltan sin cambiar el ancho ni el grosor del texto, para
+   que las líneas corten igual que en la hoja impresa. */
+.rd-desk .paper .campo{padding:0; font-weight:inherit; box-shadow:0 0 0 2px var(--highlight); border-radius:2px;}
 .paper h1{font-size:20pt; line-height:1.3; margin:0 0 12pt;}
 .paper h2{font-size:16pt; line-height:1.3; margin:14pt 0 8pt;}
 .paper h3{font-size:13pt; line-height:1.3; margin:12pt 0 6pt;}
-.paper .salto-pagina{position:relative; display:block; height:0; margin:22px -2cm; border-top:2px dashed var(--page-break);}
+.paper .salto-pagina{position:relative; display:block; height:0; margin:0 calc(-1 * var(--margen, 2cm)); border-top:2px dashed var(--page-break);}
 .paper .salto-pagina::after{
   content:'Salto de página';
   position:absolute; left:50%; top:-9px; transform:translateX(-50%);
@@ -956,6 +996,13 @@ html[data-theme="light"]{--desk-bg:#E3E6EC; --page-break:color-mix(in srgb, var(
 }
 .cfg-field input:focus, .cfg-field select:focus{outline:3px solid var(--focus); border-color:var(--accent);}
 .cfg-field input::placeholder{color:var(--text-faint);}
+.cfg-check{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:.84rem; color:var(--text); cursor:pointer;}
+.cfg-check input{width:16px; height:16px; accent-color:var(--accent); cursor:pointer; flex-shrink:0;}
+/* Desglose por apartamento dentro de una fila de Liquidaciones */
+.liq-desglose{margin-top:4px; font-size:.76rem; color:var(--text-muted);}
+.liq-desglose summary{cursor:pointer; color:var(--accent); width:max-content;}
+.liq-desglose ul{list-style:none; margin:4px 0 0; padding:0;}
+.liq-desglose li{display:flex; justify-content:space-between; gap:12px; padding:2px 0; border-top:1px dashed var(--border);}
 .cfg-card .theme-toggle, .cfg-card .update-toggle{display:inline-flex; align-items:center; gap:7px;}
 .cfg-card .update-toggle .icon{color:var(--accent);}
 @media (max-width:900px){ .cfg-grid{grid-template-columns:minmax(0,1fr);} }
@@ -1295,3 +1342,99 @@ i.ag-aumento{background:var(--ag-aumento);}
 .acta-fotos-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 6px;}
 .acta-fotos{display:flex; flex-wrap:wrap; gap:6px 14px; font-size:.84rem;}
 @media (max-width:800px){ .acta-campos{grid-template-columns:repeat(2, minmax(0,1fr));} }
+
+/* ---------- Ayuda: recorrido interactivo (tour.js) ---------- */
+.topbar-search{margin-left:auto;}
+.topbar-ayuda{
+  position:relative; flex-shrink:0; display:grid; place-items:center;
+  width:38px; height:38px; padding:0;
+  border:1px solid var(--border-strong); border-radius:50%;
+  background:var(--surface-raised); color:var(--accent); cursor:pointer;
+}
+.topbar-ayuda:hover, .topbar-ayuda[aria-expanded="true"]{border-color:var(--accent); background:var(--highlight);}
+.topbar-ayuda svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round;}
+/* Primera vez: un pulso invita a hacer el recorrido. */
+.topbar-ayuda.pulso::after{
+  content:''; position:absolute; inset:-4px; border-radius:50%;
+  border:2px solid var(--accent); animation:tour-pulso 1.8s ease-out infinite;
+}
+@keyframes tour-pulso{ from{opacity:.9; transform:scale(.9);} to{opacity:0; transform:scale(1.35);} }
+
+.tour-menu{
+  position:fixed; z-index:90; width:300px; padding:8px;
+  border:1px solid var(--border-strong); border-radius:12px;
+  background:var(--surface-raised); color:var(--text);
+  box-shadow:0 16px 40px rgba(0,0,0,.3); font:500 .8rem var(--font-ui);
+}
+.tour-menu-principal{
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%;
+  padding:9px 11px; margin-bottom:4px; border:1px solid var(--border); border-radius:8px;
+  background:var(--surface); color:var(--text); text-align:left; cursor:pointer;
+}
+.tour-menu-principal:hover{border-color:var(--accent);}
+.tour-menu-principal strong{font-size:.86rem;}
+.tour-menu-principal span{font-size:.72rem; color:var(--text-muted);}
+.tour-menu-titulo{margin:10px 4px 6px; font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.tour-menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:4px;}
+.tour-menu-grid button{
+  padding:7px 9px; border:0; border-radius:7px; background:transparent; color:var(--text);
+  font:500 .78rem var(--font-ui); text-align:left; cursor:pointer;
+}
+.tour-menu-grid button:hover{background:var(--highlight); color:var(--accent);}
+
+.tour-capa{position:fixed; inset:0; z-index:95;}
+.tour-foco{
+  position:fixed; border-radius:10px; pointer-events:none;
+  box-shadow:0 0 0 3px var(--accent), 0 0 0 9999px rgba(6,10,18,.62);
+  transition:top .28s ease, left .28s ease, width .28s ease, height .28s ease;
+}
+.tour-foco.sin-foco{top:50% !important; left:50% !important; width:0 !important; height:0 !important; box-shadow:0 0 0 9999px rgba(6,10,18,.62);}
+.tour-card{
+  position:fixed; width:320px; max-width:calc(100vw - 24px); padding:16px 16px 12px;
+  border:1px solid var(--border-strong); border-radius:12px;
+  background:var(--surface-raised); color:var(--text);
+  box-shadow:0 18px 44px rgba(0,0,0,.4);
+  transition:top .28s ease, left .28s ease;
+}
+.tour-cerrar{position:absolute; top:8px; right:8px; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--text-muted); cursor:pointer;}
+.tour-cerrar:hover{background:var(--highlight); color:var(--text);}
+.tour-seccion{font-size:.66rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--accent);}
+.tour-titulo{margin:4px 28px 6px 0; font-size:1.02rem; color:var(--text);}
+.tour-texto{margin:0 0 12px; font-size:.84rem; line-height:1.5; color:var(--text-muted);}
+.tour-barra{height:3px; margin-bottom:10px; border-radius:2px; background:var(--border); overflow:hidden;}
+.tour-barra span{display:block; height:100%; background:var(--accent); transition:width .28s ease;}
+.tour-pie{display:flex; align-items:center; gap:6px;}
+.tour-cuenta{flex:1; font-size:.72rem; color:var(--text-muted); font-variant-numeric:tabular-nums;}
+.tour-pie button{height:32px; padding:0 12px; font-size:.8rem;}
+@media (prefers-reduced-motion:reduce){ .tour-foco, .tour-card, .tour-barra span{transition:none;} .topbar-ayuda.pulso::after{animation:none;} }
+
+/* ---------- Recordatorios: enviar a todos (correo automático + WhatsApp guiado) ---------- */
+.lote-todos{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px;}
+.lote-opcion{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-muted); cursor:pointer;}
+.lote-opcion input{width:15px; height:15px; accent-color:var(--accent);}
+.lote-estado{flex:1 1 220px; font-size:.78rem; color:var(--text-muted);}
+.lote-estado .link-btn{font-size:inherit;}
+.lote-guia{
+  display:flex; align-items:center; gap:8px; margin-top:12px; padding:10px 12px;
+  border:1px solid var(--accent); border-radius:10px;
+  background:color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+}
+.lote-guia-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+.lote-guia-paso{font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent);}
+.lote-guia-main strong{font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.lote-fila.actual{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+.lote-error{color:var(--danger, #e5484d); font-weight:600;}
+.correo-servidor{display:grid; grid-template-columns:1fr 110px; gap:10px;}
+
+/* ---------- Licencia "solo redactor" (body[data-plan="redactor"]) ---------- */
+body[data-plan="redactor"] .side-nav .nav-item:not([data-view="redactor"]):not([data-view="configuracion"]):not(#btnLockNow),
+body[data-plan="redactor"] .side-nav .nav-label,
+body[data-plan="redactor"] #btnBuscar,
+body[data-plan="redactor"] .solo-completo{display:none !important;}
+/* De los valores predeterminados solo queda el papel de impresión. */
+body[data-plan="redactor"] .cfg-field:has([data-ajuste]):not(:has([data-ajuste="papel"])){display:none;}
+
+/* ---------- Liquidaciones: por mes o todo ---------- */
+.liq-modo{flex-shrink:0;}
+.liq-modo .seg-tab{padding:6px 12px; white-space:nowrap;}
+.data-table .liq-mes{white-space:nowrap; font-weight:600;}

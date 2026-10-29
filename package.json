@@ -16,7 +16,8 @@
     "test:e2e": "electron tests/e2e/run.js"
   },
   "dependencies": {
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "nodemailer": "^10.3.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
@@ -31,6 +32,7 @@
     },
     "files": [
       "main.js",
+      "licencia-publica.pem",
       "xlsx-writer.js",
       "preload.js",
       "preview-preload.js",
