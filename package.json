@@ -1,6 +1,6 @@
 {
   "name": "redactor-contratos",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Gestión de alquileres y redactor de contratos (Electron)",
   "main": "main.js",
   "author": "",
