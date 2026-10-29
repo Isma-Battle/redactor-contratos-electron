@@ -3935,6 +3935,7 @@
     font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     font-size:12pt;
     line-height:1.6;
+    font-optical-sizing:none;
     color:#1a1a1a;
     background:#fff;
     position:relative;
@@ -3943,7 +3944,9 @@
   h1{ font-size:20pt; line-height:1.3; margin:0 0 12pt; }
   h2{ font-size:16pt; line-height:1.3; margin:14pt 0 8pt; }
   h3{ font-size:13pt; line-height:1.3; margin:12pt 0 6pt; }
-  p, li, h1, h2, h3, blockquote, tr{ break-inside:avoid; }
+  /* Como en el editor (y Word): los párrafos se parten entre páginas dejando al menos 2 líneas en cada una. */
+  p, li, blockquote, div{ orphans:2; widows:2; }
+  h1, h2, h3, tr{ break-inside:avoid; }
   img{ max-width:100%; }
 </style>
 </head>
@@ -4077,7 +4080,9 @@
     return out;
   }
 
-  // Lo que añade el paginado no forma parte del documento.
+  // Lo que añade el paginado no forma parte del documento: el empuje de los
+  // párrafos que pasan enteros a la hoja siguiente (.pag-salto) y los cortes
+  // dentro de los párrafos que se parten entre dos hojas (.pag-corte).
   function limpiarPaginacion(root){
     root.querySelectorAll('.pag-salto').forEach(el => {
       el.classList.remove('pag-salto');
@@ -4085,6 +4090,9 @@
       if (!el.getAttribute('class')) el.removeAttribute('class');
       if (!el.getAttribute('style')) el.removeAttribute('style');
     });
+    const padres = new Set();
+    root.querySelectorAll('.pag-corte').forEach(c => { padres.add(c.parentNode); c.remove(); });
+    padres.forEach(p => { if (p) p.normalize(); }); // vuelve a unir el texto que se separó
   }
   function htmlDelEditor(){
     const clone = editor.cloneNode(true);
@@ -4092,12 +4100,114 @@
     return clone.innerHTML;
   }
 
+  // ---------- Párrafos que se parten entre hojas (como Word) ----------
+  // Cuando un párrafo no cabe en lo que queda de la hoja, se parte en la
+  // línea que ya no cabe: delante de ella se pone un espaciador
+  // (.pag-corte, inline-block a todo el ancho) del alto que falta hasta el
+  // principio de la hoja siguiente. Como cae justo donde la línea ya se
+  // cortaba, el texto no cambia de sitio (y la línea anterior sigue
+  // justificada). Igual que Word con "Control de líneas viudas y huérfanas",
+  // en cada hoja quedan al menos 2 líneas del párrafo; la impresión usa la
+  // misma regla (orphans/widows: 2).
+  const PARTIBLES = new Set(['P', 'DIV', 'LI', 'BLOCKQUOTE']);
+  const MIN_LINEAS = 2;
+  function partible(el){ return PARTIBLES.has(el.tagName) && !el.querySelector('img, table, .img-wrap'); }
+  function textosDe(el){
+    const out = [];
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) if (n.length) out.push(n);
+    return out;
+  }
+  // Líneas del párrafo en px de la hoja (sin zoom), con la caja completa de
+  // cada línea (el interlineado incluido), a partir de los trozos de texto.
+  function lineasDe(el, m){
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 0;
+    const r = document.createRange();
+    const rects = [];
+    textosDe(el).forEach(n => {
+      r.selectNodeContents(n);
+      [...r.getClientRects()].forEach(x => {
+        if (!(x.width > 0 && x.height > 0)) return;
+        const top = (x.top - m.origen) / m.escala, bottom = (x.bottom - m.origen) / m.escala;
+        const medio = lh ? (lh - (bottom - top)) / 2 : 0; // negativo si la letra es más alta que la línea
+        rects.push({ top: top - medio, bottom: bottom + medio });
+      });
+    });
+    rects.sort((a, b) => a.top - b.top);
+    const lineas = [];
+    rects.forEach(x => {
+      const ult = lineas[lineas.length - 1];
+      if (!ult || x.top >= ult.bottom - 2) lineas.push({ top: x.top, bottom: x.bottom });
+      else { ult.top = Math.min(ult.top, x.top); ult.bottom = Math.max(ult.bottom, x.bottom); }
+    });
+    return lineas;
+  }
+  // Primer carácter visible de la línea que empieza en "topLinea" (búsqueda
+  // binaria: los caracteres van en orden de línea). Devuelve [nodo, posición].
+  function inicioDeLinea(el, topLinea, m){
+    const chars = [];
+    textosDe(el).forEach(n => { for (let i = 0; i < n.length; i++) chars.push([n, i]); });
+    const r = document.createRange();
+    const medioDe = (i) => {
+      for (; i < chars.length; i++) {
+        r.setStart(chars[i][0], chars[i][1]); r.setEnd(chars[i][0], chars[i][1] + 1);
+        const x = r.getClientRects()[0];
+        if (x && x.width > 0) return { i, medio: ((x.top + x.bottom) / 2 - m.origen) / m.escala };
+      }
+      return null;
+    };
+    let lo = 0, hi = chars.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const c = medioDe(mid);
+      if (!c || c.medio > topLinea) hi = mid; else lo = c.i + 1;
+    }
+    const c = medioDe(lo);
+    return c ? chars[c.i] : null;
+  }
+  function insertarCorte(el, pos, alto){
+    const corte = document.createElement('span');
+    corte.className = 'pag-corte';
+    corte.setAttribute('contenteditable', 'false');
+    corte.setAttribute('aria-hidden', 'true');
+    corte.style.setProperty('--corte', (Math.round(alto * 100) / 100) + 'px');
+    let [nodo, off] = pos;
+    const campo = nodo.parentElement && nodo.parentElement.closest('.campo');
+    if (campo && el.contains(campo)) { campo.before(corte); return; } // un campo no se parte
+    if (off > 0) nodo = nodo.splitText(off);
+    nodo.before(corte);
+  }
+  // Parte el párrafo las veces que haga falta (uno muy largo puede ocupar
+  // varias hojas). Devuelve false si no se puede partir respetando el mínimo
+  // de líneas: entonces pasa entero a la hoja siguiente.
+  function partirParrafo(el, m){
+    let partido = false;
+    for (let vuelta = 0; vuelta < 60; vuelta++) {
+      const lineas = lineasDe(el, m);
+      const paginaDe = (l) => Math.floor((l.top + 0.5) / m.paso);
+      const k = lineas.findIndex(l => l.bottom > paginaDe(l) * m.paso + m.alto - m.margen + 0.5);
+      if (k === -1) return partido;
+      const pagina = paginaDe(lineas[k]);
+      const primeraEnHoja = lineas.findIndex(l => paginaDe(l) === pagina);
+      let corte = Math.min(k, lineas.length - MIN_LINEAS);         // al menos 2 pasan a la hoja siguiente
+      if (corte - primeraEnHoja < MIN_LINEAS) return partido;       // y al menos 2 se quedan en esta
+      const alto = (pagina + 1) * m.paso + m.margen - lineas[corte].top;
+      const pos = alto > 0 ? inicioDeLinea(el, lineas[corte].top, m) : null;
+      if (!pos) return partido;
+      insertarCorte(el, pos, alto);
+      partido = true;
+    }
+    return partido;
+  }
+
+  let observadorPagina = null;
   function paginar(){
     if (!hasContent || editor.hidden) return;
     const { alto, margen, paso } = medidasPx();
     limpiarPaginacion(editor);
     const escala = escalaEditor();
     const origen = editor.getBoundingClientRect().top;
+    const m = { alto, margen, paso, escala, origen };
     const bloques = bloquesDelDocumento(true).map(el => {
       const r = el.getBoundingClientRect();
       return { el, top: (r.top - origen) / escala, alto: r.height / escala };
@@ -4110,6 +4220,13 @@
       const finTexto = pagina * paso + alto - margen;
       let destino = null;
       if (paginaForzada !== null) destino = paginaForzada * paso + margen;
+      else if (top <= finTexto && top + b.alto > finTexto + 0.5 && partible(b.el) && partirParrafo(b.el, m)) {
+        // Partido entre hojas: los bloques siguientes bajan lo que creció.
+        const nuevoAlto = b.el.getBoundingClientRect().height / escala;
+        desplazado += nuevoAlto - b.alto;
+        fin = Math.max(fin, top + nuevoAlto);
+        return;
+      }
       // No cabe en lo que queda de la hoja (y sí en una hoja entera), o empieza en el margen inferior.
       else if ((top + b.alto > finTexto + 0.5 && b.alto <= alto - 2 * margen) || top > finTexto) destino = (pagina + 1) * paso + margen;
       paginaForzada = null;
@@ -4125,6 +4242,8 @@
     });
     totalPaginas = Math.max(1, Math.floor((fin + margen - 1) / paso) + 1, paginaForzada !== null ? paginaForzada + 1 : 1);
     editor.style.minHeight = (totalPaginas * paso - HUECO_HOJAS) + 'px';
+    // Los cambios del propio paginado no deben volver a programarlo.
+    if (observadorPagina) observadorPagina.takeRecords();
     actualizarStats();
   }
 
@@ -4132,9 +4251,10 @@
   // o redimensionar imágenes); los cambios del propio paginado se ignoran.
   let paginarTimer = null;
   function programarPaginado(){ clearTimeout(paginarTimer); paginarTimer = setTimeout(paginar, 120); }
-  new MutationObserver((cambios) => {
+  observadorPagina = new MutationObserver((cambios) => {
     if (cambios.some(c => c.type !== 'attributes' || c.target.tagName === 'IMG' || (c.target.classList && c.target.classList.contains('img-wrap')))) programarPaginado();
-  }).observe(editor, { childList:true, characterData:true, subtree:true, attributes:true, attributeFilter:['style'] });
+  });
+  observadorPagina.observe(editor, { childList:true, characterData:true, subtree:true, attributes:true, attributeFilter:['style'] });
   // Un párrafo nuevo (Enter) copia los atributos del anterior, también el
   // empuje del paginado: se repagina al momento para que no se vea el salto.
   editor.addEventListener('input', (e) => { if (e.inputType === 'insertParagraph') { clearTimeout(paginarTimer); paginar(); } });
@@ -4352,6 +4472,11 @@
     getHtml(){
       deselectAllImages();
       return htmlDelEditor();
+    },
+    // Lo necesario para el PDF del documento abierto, como al pulsar "PDF".
+    datosPdf(){
+      deselectAllImages();
+      return { bodyHtml: buildExportHtml(), pageSize: paperSizeSelect.value, landscape: landscapeCheckbox.checked, margen: margenSelect.value + 'cm' };
     },
     loadHtml: loadIntoEditor,
     // Modelos de la carpeta de trabajo: [{ id, name, mtime }] (vacío si no

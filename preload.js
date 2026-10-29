@@ -49,7 +49,11 @@ contextBridge.exposeInMainWorld('rcExpediente', {
   list: (folder) => ipcRenderer.invoke('rc-exp-list', folder),
   add: (folder) => ipcRenderer.invoke('rc-exp-add', folder),
   open: (folder, name) => ipcRenderer.invoke('rc-exp-open', folder, name || null),
-  trash: (folder, name) => ipcRenderer.invoke('rc-exp-trash', folder, name)
+  trash: (folder, name) => ipcRenderer.invoke('rc-exp-trash', folder, name),
+  // PDF de un documento ({ bodyHtml, pageSize, landscape, margen }) guardado en el expediente.
+  pdf: (folder, name, datos) => ipcRenderer.invoke('rc-exp-pdf', folder, name, datos),
+  // Elegir un archivo (PDF o imagen) y guardarlo en el expediente como "nombreBase.ext".
+  subir: (folder, nombreBase, titulo) => ipcRenderer.invoke('rc-exp-subir', folder, nombreBase, titulo)
 });
 
 // Exportar a Excel: sheets = [{ name, columns: [{ header, type, width }], rows }].

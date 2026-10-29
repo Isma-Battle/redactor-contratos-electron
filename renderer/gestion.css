@@ -798,6 +798,9 @@ html[data-theme="light"]{--desk-bg:#E3E6EC; --page-break:color-mix(in srgb, var(
   border-radius:0;
   font-family:'Source Serif 4', Georgia, 'Times New Roman', serif;
   font-size:12pt;
+  /* La fuente cambia el ancho de las letras según el tamaño en pantalla (zoom):
+     fijo, para que las líneas corten igual que al imprimir. */
+  font-optical-sizing:none;
   line-height:1.6;
   background-color:transparent;
   background-image:repeating-linear-gradient(to bottom,
@@ -807,6 +810,8 @@ html[data-theme="light"]{--desk-bg:#E3E6EC; --page-break:color-mix(in srgb, var(
 }
 .rd-desk .paper:focus{box-shadow:none; outline:none;}
 .rd-desk .paper .pag-salto{padding-top:var(--pag) !important;}
+/* Corte de un párrafo que sigue en la hoja siguiente: ocupa una línea entera del alto que falta. */
+.rd-desk .paper .pag-corte{display:inline-block; width:100%; height:var(--corte); vertical-align:top; line-height:0; user-select:none; pointer-events:none;}
 /* Los campos se resaltan sin cambiar el ancho ni el grosor del texto, para
    que las líneas corten igual que en la hoja impresa. */
 .rd-desk .paper .campo{padding:0; font-weight:inherit; box-shadow:0 0 0 2px var(--highlight); border-radius:2px;}

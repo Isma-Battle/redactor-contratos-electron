@@ -1246,11 +1246,17 @@
           '<td class="num">' + esc(fmtMoney(c.monto, c.moneda)) + (Number(c.itbis) > 0 ? '<span class="cell-sub">+ ITBIS ' + esc(fmtNumber(c.itbis).replace(/[.,]00$/, '')) + '%</span>' : '') +
             (proximoAumento(c) ? '<span class="cell-sub">Aumento ' + esc(fmtPeriodo(proximoAumento(c).periodo)) + '</span>' : '') + (dep ? '<span class="cell-sub">Depósito: ' + esc(dep.label) + '</span>' : '') + '</td>' +
           '<td>' + badge(s.key, s.label) + (c.renovadoA ? '<span class="cell-sub">Renovado</span>' : '') + (caso ? '<span class="cell-sub caso-flag">En caso: ' + esc(etapaLabel(caso.etapa)) + '</span>' : '') + '</td>' +
-          '<td>' + (c.documentoHtml ? '<span class="cell-main">Redactado</span><span class="cell-sub">' + esc(c.documentoActualizado ? new Date(c.documentoActualizado).toLocaleDateString() : '') + '</span>' : '<span class="muted">Pendiente</span>') + '</td>' +
+          '<td>' + (c.firmado
+              ? '<button type="button" class="link-btn" data-act="ver-firmado" data-id="' + esc(c.id) + '" title="Abrir el contrato firmado">Firmado ✓</button><span class="cell-sub">Subido el ' + esc(new Date(c.firmado.fecha).toLocaleDateString()) + '</span>'
+              : c.documentoHtml ? '<span class="cell-main">Redactado</span><span class="cell-sub">' + esc(c.documentoActualizado ? new Date(c.documentoActualizado).toLocaleDateString() : '') + ' · sin firmar</span>'
+              : '<span class="muted">Pendiente</span>') + '</td>' +
           '<td><div class="row-actions">' +
             '<button type="button" class="btn-brass" data-act="documento" data-id="' + esc(c.id) + '">' + (c.documentoHtml ? 'Abrir documento' : 'Redactar') + '</button>' +
             '<button type="button" class="btn-panel" data-act="editar-contrato" data-id="' + esc(c.id) + '">Editar</button>' +
             rowMenu([
+              c.documentoHtml && { act:'contrato-pdf', id:c.id, label:'Contrato en PDF' },
+              { act:'subir-firmado', id:c.id, label: c.firmado ? 'Reemplazar contrato firmado…' : 'Subir contrato firmado…' },
+              c.firmado && { act:'ver-firmado', id:c.id, label:'Ver contrato firmado' },
               !c.renovadoA && { act:'renovar', id:c.id, label:'Renovar contrato…' },
               Number(c.deposito) > 0 && { act:'deposito', id:c.id, label:'Depósito…' },
               { act:'estado-cuenta-inquilino', id:c.id, label:'Estado de cuenta' },
@@ -1775,6 +1781,75 @@
     return ui.showConfirmDialog('Esto reemplazará el documento que tienes abierto en el redactor. Si tiene cambios que quieras conservar, guárdalo antes. ¿Continuar?', 'Abrir documento del contrato');
   }
 
+  // ---------- PDF del contrato y contrato firmado ----------
+  // Ambos van al expediente del inquilino principal (<carpeta de trabajo>/
+  // Expedientes/...), así se ven también en "Archivos del expediente":
+  //  - "Contrato - <inmueble> - <inicio>.pdf": se genera al guardar el
+  //    documento en el contrato (es el que se imprime para firmar).
+  //  - "... (firmado).pdf" (o .jpg...): el escaneado ya firmado, que se sube.
+  // c.pdfArchivo y c.firmado = { archivo, fecha } guardan sus nombres.
+  function baseArchivoContrato(c){
+    const u = byId(db.unidades, c.unidadId);
+    return ('Contrato - ' + unidadLabel(u) + (c.fechaInicio ? ' - ' + c.fechaInicio : '')).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 100);
+  }
+
+  // PDF del documento abierto en el redactor (el de "c") en su expediente.
+  async function guardarPdfContrato(c, silencioso){
+    const t = byId(db.inquilinos, c.inquilinoId);
+    if (!t || !window.rcExpediente || !ed.datosPdf) return false;
+    if (silencioso && !(ed.hasWorkFolder && ed.hasWorkFolder())) return false;
+    if (!(await asegurarCarpetaExpediente(t))) return false;
+    const r = await window.rcExpediente.pdf(t.expedienteCarpeta, baseArchivoContrato(c) + '.pdf', ed.datosPdf());
+    if (!r.ok) {
+      if (!silencioso) await ui.showNotice('No se pudo guardar el PDF del contrato: ' + r.error);
+      return false;
+    }
+    c.pdfArchivo = r.name;
+    await persist();
+    return r.name;
+  }
+
+  async function abrirArchivoContrato(c, nombre){
+    const t = byId(db.inquilinos, c.inquilinoId);
+    const r = t && t.expedienteCarpeta && nombre ? await window.rcExpediente.open(t.expedienteCarpeta, nombre) : { ok:false };
+    if (!r.ok) await ui.showNotice('No se encontró "' + (nombre || 'el archivo') + '" en el expediente de ' + (t ? t.nombre : 'el inquilino') + '. Puede que se haya movido o borrado.', 'Archivo no encontrado');
+    return r.ok;
+  }
+
+  // "Contrato en PDF": lo abre; si todavía no existe (contratos anteriores),
+  // lo genera con el documento guardado en el contrato.
+  async function contratoPdf(id){
+    const c = byId(db.contratos, id);
+    if (!c || !c.documentoHtml || !window.rcExpediente) return;
+    const t = byId(db.inquilinos, c.inquilinoId);
+    if (c.pdfArchivo && t && t.expedienteCarpeta && (await window.rcExpediente.open(t.expedienteCarpeta, c.pdfArchivo)).ok) return;
+    if (linkedContractId !== c.id) {
+      if (!(await confirmReplaceEditor(c))) return;
+      ed.loadHtml(c.documentoHtml);
+      linkContract(c);
+    }
+    const nombre = await guardarPdfContrato(c, false);
+    if (nombre) await abrirArchivoContrato(c, nombre);
+    renderActive();
+    if (tenantDetailId) renderTenantDetail();
+  }
+
+  async function subirFirmado(id){
+    const c = byId(db.contratos, id);
+    const t = c && byId(db.inquilinos, c.inquilinoId);
+    if (!c || !t || !window.rcExpediente) return;
+    if (!(await asegurarCarpetaExpediente(t))) return;
+    if (c.firmado && !(await ui.showConfirmDialog('Este contrato ya tiene su versión firmada ("' + c.firmado.archivo + '"). ¿Reemplazarla?', 'Contrato firmado'))) return;
+    const r = await window.rcExpediente.subir(t.expedienteCarpeta, baseArchivoContrato(c) + ' (firmado)', 'Contrato firmado escaneado');
+    if (r.canceled) return;
+    if (!r.ok) { await ui.showNotice('No se pudo subir el archivo: ' + r.error); return; }
+    c.firmado = { archivo: r.name, fecha: new Date().toISOString() };
+    await registrarSeguimiento(t.id, 'Contrato firmado subido: ' + r.name + '.'); // también guarda
+    renderActive();
+    if (tenantDetailId) renderTenantDetail();
+  }
+
   async function openContractDocument(id){
     const c = byId(db.contratos, id);
     if (!c) return;
@@ -1876,6 +1951,8 @@
     if (await persist()) {
       ed.setStatus('Documento guardado en el contrato de ' + contractTitle(c) + '.');
       updateLinkBar();
+      // Y su PDF en el expediente, listo para imprimir y firmar.
+      if (await guardarPdfContrato(c, true)) ed.setStatus('Documento guardado en el contrato de ' + contractTitle(c) + ' y su PDF en el expediente.');
     }
   });
 
@@ -5291,6 +5368,9 @@
     'finalizar': finalizeContrato,
     'borrar-contrato': deleteContrato,
     'documento': openContractDocument,
+    'contrato-pdf': contratoPdf,
+    'subir-firmado': subirFirmado,
+    'ver-firmado': (id) => { const c = byId(db.contratos, id); if (c && c.firmado) abrirArchivoContrato(c, c.firmado.archivo); },
     'pagar': (id, btn) => openPagoForm(null, { contratoId: id, periodo: btn.dataset.periodo || monthOf(todayStr()) }),
     'recibo': (id) => printRecibo(id),
     'recibo-pdf': (id) => printRecibo(id, true),

@@ -142,6 +142,17 @@ ipcMain.handle('rc-export-xlsx', (_e, payload) => {
   return { ok: true, path: xlsxPath, name: path.basename(xlsxPath), sheets: payload.sheets.map(s => s.name) };
 });
 
+// "Subir contrato firmado": se elige un PDF escaneado de prueba.
+fs.writeFileSync(path.join(fixtures, 'escaneo firmado.pdf'), '%PDF-1.4\n% contrato firmado de prueba\n');
+const abrirOriginal = dialog.showOpenDialog.bind(dialog);
+dialog.showOpenDialog = async (win, opts) => {
+  if (opts && opts.title === 'Contrato firmado escaneado') return { canceled: false, filePaths: [path.join(fixtures, 'escaneo firmado.pdf')] };
+  return abrirOriginal(win, opts);
+};
+// Abrir un archivo (PDF del contrato, firmado...) no abre nada: se anota.
+const archivosAbiertos = [];
+shell.openPath = async (p) => { archivosAbiertos.push(p); return ''; };
+
 ipcMain.removeHandler('rc-exp-add');
 ipcMain.handle('rc-exp-add', (_e, folder) => {
   const dir = path.join(workDir, 'Expedientes', folder);
@@ -183,6 +194,13 @@ function verificarArchivos() {
   check('modelos en la subcarpeta Modelos', listar(path.join(workDir, 'Modelos')).length === 2);
   const exp = fs.existsSync(path.join(workDir, 'Expedientes')) ? fs.readdirSync(path.join(workDir, 'Expedientes')) : [];
   check('carpeta de expediente con el archivo adjunto', exp.length === 1 && listar(path.join(workDir, 'Expedientes', exp[0])).includes('cedula-escaneada.txt'));
+  const archivosExp = exp.length ? listar(path.join(workDir, 'Expedientes', exp[0])) : [];
+  const pdfContrato = archivosExp.find(n => /^Contrato - .+\.pdf$/.test(n) && !n.includes('(firmado)'));
+  const firmado = archivosExp.find(n => /^Contrato - .+ \(firmado\)\.pdf$/.test(n));
+  check('PDF del contrato en el expediente (' + pdfContrato + ')', !!pdfContrato && fs.readFileSync(path.join(workDir, 'Expedientes', exp[0], pdfContrato)).slice(0, 4).toString() === '%PDF');
+  check('contrato firmado en el expediente con su nombre (' + firmado + ')', !!firmado && fs.readFileSync(path.join(workDir, 'Expedientes', exp[0], firmado), 'utf8').includes('contrato firmado de prueba'));
+  check('"Firmado ✓" y "Contrato en PDF" abren sus archivos', archivosAbiertos.some(p => p.endsWith('(firmado).pdf')) && archivosAbiertos.some(p => p.endsWith(pdfContrato || '?')));
+  check('el contrato guarda los nombres de sus archivos', datos.contratos.some(c => c.firmado && c.firmado.archivo === firmado && c.pdfArchivo === pdfContrato));
 
   const ultimoRecibo = printed.filter(p => p.bodyHtml.includes('RECIBO DE PAGO')).pop();
   check('recibo con el despacho y el papel de la configuración', !!ultimoRecibo && ultimoRecibo.bodyHtml.includes('Administrado por Bufete Prueba SRL · Tel. 809-555-0000') && ultimoRecibo.pageSize === 'A4');

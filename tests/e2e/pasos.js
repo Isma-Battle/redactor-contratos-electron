@@ -175,8 +175,24 @@
 
   $('#btnLinkSave').click(); await wait(300);
   check('documento guardado en el contrato', $('#contractLinkText').textContent.includes('guardado el'));
+  for (let i = 0; i < 40 && !$('#saveStatus').textContent.includes('PDF'); i++) await wait(100);
+  check('y su PDF en el expediente del inquilino', $('#saveStatus').textContent.includes('y su PDF en el expediente'));
   $('.nav-item[data-view="contratos"]').click(); await wait();
-  check('contrato muestra "Redactado"', $('#tableContratos').textContent.includes('Redactado'));
+  check('contrato muestra "Redactado" y sin firmar', $('#tableContratos').textContent.includes('Redactado') && $('#tableContratos').textContent.includes('sin firmar'));
+  // Contrato firmado y escaneado
+  const filaRedactada = () => [...document.querySelectorAll('#tableContratos tbody tr')].find(tr => tr.textContent.includes('Redactado') || tr.textContent.includes('Firmado ✓'));
+  check('menú del contrato: PDF y subir firmado', !!filaRedactada().querySelector('.row-menu [data-act="contrato-pdf"]') && !!filaRedactada().querySelector('.row-menu [data-act="subir-firmado"]'));
+  filaRedactada().querySelector('.row-menu [data-act="subir-firmado"]').click(); await wait(800);
+  check('subir el contrato firmado: queda "Firmado ✓"', filaRedactada().textContent.includes('Firmado ✓') && !!filaRedactada().querySelector('[data-act="ver-firmado"]') &&
+    filaRedactada().querySelector('.row-menu [data-act="subir-firmado"]').textContent.startsWith('Reemplazar'));
+  filaRedactada().querySelector('[data-act="ver-firmado"]').click(); await wait(300);
+  filaRedactada().querySelector('.row-menu [data-act="contrato-pdf"]').click(); await wait(300);
+  // En la ficha del inquilino: el contrato firmado y los dos archivos en el expediente
+  filaRedactada().querySelector('[data-act="ver-inquilino"]').click(); await wait(800);
+  check('la ficha muestra el contrato firmado y sus archivos', $('#tenantDetailBody').textContent.includes('Firmado ✓') &&
+    $('#expFiles').textContent.includes('(firmado).pdf') && /Contrato - .*\.pdf/.test($('#expFiles').textContent));
+  check('subir el firmado queda en el seguimiento', $('#tenantDetailBody').textContent.includes('Contrato firmado subido'));
+  $('#tenantDetailClose').click(); await wait();
 
   // ---------- Redactor: carpeta de trabajo, documentos y modelos ----------
   $('.nav-item[data-view="redactor"]').click(); await wait();
@@ -1167,24 +1183,51 @@
   check('botón PDF del redactor', $('#saveStatus').textContent.startsWith('PDF guardado:'));
   check('lo que sigue al salto de página empieza en la hoja 2', /· 2 páginas/.test($('#rdStats').textContent) && !!ed.querySelector('.salto-pagina ~ .pag-salto'));
 
-  // Hojas como en Word: ningún párrafo cruza el final de una hoja
-  window.rcEditor.loadHtml(Array.from({ length: 70 }, (_, i) => '<p>Cláusula ' + (i + 1) + '. ' + 'El inquilino se obliga a cumplir lo pactado en este contrato. '.repeat(1 + i % 4) + '</p>').join('') + '<p></p><p><br></p><p>Fin.</p>');
-  await wait(400);
+  // Hojas como en Word: ninguna línea cruza el final de una hoja; los
+  // párrafos que no caben se parten (con al menos 2 líneas en cada hoja)
+  const textoLargo = 'El inquilino se obliga a cumplir lo pactado en este contrato y a conservar el inmueble en buen estado. '.repeat(110);
+  window.rcEditor.loadHtml(Array.from({ length: 70 }, (_, i) => '<p>Cláusula ' + (i + 1) + '. ' + 'El inquilino se obliga a cumplir lo pactado en este contrato. '.repeat(1 + i % 4) + '</p>' +
+    (i === 30 ? '<p id="pLargo">' + textoLargo + '</p>' : '')).join('') + '<p></p><p><br></p><p>Fin.</p>');
+  await wait(500);
+  // Líneas de texto de cada párrafo, con la hoja en que cae cada una
+  const lineasTexto = (p) => {
+    const alto = 11 * 96, paso = alto + 24;
+    const escala = ed.getBoundingClientRect().height / ed.offsetHeight, origen = ed.getBoundingClientRect().top;
+    const r = document.createRange(), out = [];
+    const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      r.selectNodeContents(n);
+      [...r.getClientRects()].filter(x => x.width > 0).forEach(x => {
+        // caja de la línea (con el interlineado), como al imprimir
+        const lh = parseFloat(getComputedStyle(p).lineHeight) || 0, g = (x.bottom - x.top) / escala, medio = lh ? (lh - g) / 2 : 0;
+        const top = (x.top - origen) / escala - medio, bajo = (x.bottom - origen) / escala + medio;
+        if (!out.some(l => Math.abs(l.top - top) < 3)) out.push({ top, bajo, hoja: Math.floor((top + 1) / paso) });
+      });
+    }
+    return out;
+  };
   const hojas = () => {
     const alto = 11 * 96, margen = Number($('#margenSelect').value) * 96 / 2.54, paso = alto + 24;
-    const escala = ed.getBoundingClientRect().height / ed.offsetHeight, origen = ed.getBoundingClientRect().top;
-    return [...ed.querySelectorAll('p')].every(p => {
-      const r = p.getBoundingClientRect(), top = (r.top - origen) / escala + (parseFloat(getComputedStyle(p).paddingTop) || 0), bajo = (r.bottom - origen) / escala;
-      const n = Math.floor(top / paso);
-      return top >= n * paso + margen - 1 && bajo <= n * paso + alto - margen + 1;
-    });
+    return [...ed.querySelectorAll('p')].every(p => lineasTexto(p).every(l => l.top >= l.hoja * paso + margen - 1 && l.bajo <= l.hoja * paso + alto - margen + 1));
   };
-  check('documento largo: varias hojas y cada párrafo dentro del área de texto', parseInt($('#rdStats').textContent.split('·')[1], 10) >= 3 && hojas());
+  const lineasPorHoja = (p) => Object.values(lineasTexto(p).reduce((a, l) => (a[l.hoja] = (a[l.hoja] || 0) + 1, a), {}));
+  check('documento largo: varias hojas y ninguna línea fuera del área de texto', parseInt($('#rdStats').textContent.split('·')[1], 10) >= 3 && hojas());
+  check('un párrafo muy largo se reparte entre varias hojas', lineasPorHoja($('#pLargo')).length >= 3 && !!$('#pLargo .pag-corte'));
+  check('los párrafos partidos dejan al menos 2 líneas en cada hoja', [...ed.querySelectorAll('p')].filter(p => p.querySelector('.pag-corte')).every(p => lineasPorHoja(p).every(n => n >= 2)));
   check('el alto del editor es un número exacto de hojas', Math.abs((ed.offsetHeight + 24) / (11 * 96 + 24) - Math.round((ed.offsetHeight + 24) / (11 * 96 + 24))) < 0.01);
-  check('el paginado no se guarda en el documento', !window.rcEditor.getHtml().includes('pag-salto') && !window.rcEditor.getHtml().includes('--pag'));
+  check('el paginado no se guarda en el documento', !window.rcEditor.getHtml().includes('pag-salto') && !window.rcEditor.getHtml().includes('--pag') && !window.rcEditor.getHtml().includes('pag-corte'));
+  const exportado = document.createElement('div'); exportado.innerHTML = window.rcEditor.getHtml();
+  check('el texto del párrafo partido queda intacto', exportado.querySelector('#pLargo').textContent === textoLargo && exportado.querySelector('#pLargo').childNodes.length === 1);
+  // El cursor no se mueve al repartir el párrafo
+  const posCursor = () => { const s = window.getSelection(); const r = document.createRange(); r.setStart($('#pLargo'), 0); r.setEnd(s.anchorNode, s.anchorOffset); return r.toString().length; };
+  const ultimoTexto = [...$('#pLargo').childNodes].filter(n => n.nodeType === 3).pop();
+  const rCur2 = document.createRange(); rCur2.setStart(ultimoTexto, 40); rCur2.collapse(true);
+  ed.focus(); window.getSelection().removeAllRanges(); window.getSelection().addRange(rCur2);
+  const antesCursor = posCursor();
   const paginasAntes = parseInt($('#rdStats').textContent.split('·')[1], 10);
   set('margenSelect', '3.18'); $('#margenSelect').dispatchEvent(new Event('change')); await wait(200);
   check('márgenes amplios: la hoja los usa y el texto ocupa más hojas', ed.style.getPropertyValue('--margen') === '3.18cm' && parseInt($('#rdStats').textContent.split('·')[1], 10) > paginasAntes && hojas());
+  check('al repaginar el cursor sigue en el mismo sitio del texto', window.getSelection().rangeCount > 0 && posCursor() === antesCursor && $('#pLargo').contains(window.getSelection().anchorNode));
   // El PDF debe tener las mismas páginas que el editor (lo comprueba run.js por el nombre)
   const baseAntes = $('#baseName').value;
   $('#baseName').value = 'paginas_' + parseInt($('#rdStats').textContent.split('·')[1], 10);

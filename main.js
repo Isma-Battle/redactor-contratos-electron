@@ -179,6 +179,7 @@ function documentoImprimible({ bodyHtml, pageSize, landscape, margen, title, avi
     font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
     font-size:12pt;
     line-height:1.6;
+    font-optical-sizing:none;
     color:#1a1a1a;
     background:#fff;
     position:relative;
@@ -187,7 +188,9 @@ function documentoImprimible({ bodyHtml, pageSize, landscape, margen, title, avi
   h1{ font-size:20pt; line-height:1.3; margin:0 0 12pt; }
   h2{ font-size:16pt; line-height:1.3; margin:14pt 0 8pt; }
   h3{ font-size:13pt; line-height:1.3; margin:12pt 0 6pt; }
-  p, li, h1, h2, h3, blockquote, tr{ break-inside:avoid; }
+  /* Como en el editor (y Word): los párrafos se parten entre páginas dejando al menos 2 líneas en cada una. */
+  p, li, blockquote, div{ orphans:2; widows:2; }
+  h1, h2, h3, tr{ break-inside:avoid; }
   img{ max-width:100%; }
   .print-hint{
     font-family: Arial, sans-serif;
@@ -525,6 +528,48 @@ ipcMain.handle('rc-exp-open', async (event, folderName, fileName) => {
   }
 });
 
+// PDF de un documento guardado directamente en el expediente (p. ej. el
+// contrato para imprimir y firmar). Si ya existe con ese nombre, se reemplaza.
+ipcMain.handle('rc-exp-pdf', async (event, folderName, fileName, datos) => {
+  try {
+    const opts = datos || {};
+    if (!String(opts.bodyHtml || '').trim()) return { ok: false, error: 'sin-contenido' };
+    const destino = expedienteFile(folderName, fileName);
+    if (path.extname(destino).toLowerCase() !== '.pdf') throw new Error('Archivo no válido.');
+    const pdf = await generarPdf(opts, path.basename(destino, '.pdf'));
+    fs.mkdirSync(path.dirname(destino), { recursive: true });
+    fs.writeFileSync(destino, pdf);
+    writeLog('PDF en el expediente:', destino);
+    return { ok: true, name: path.basename(destino) };
+  } catch (err) {
+    writeLog('rc-exp-pdf ERROR:', err);
+    return { ok: false, error: err.message };
+  }
+});
+
+// Sube un archivo (el contrato firmado y escaneado: PDF o imagen) al
+// expediente con el nombre indicado; si ya había uno igual, lo reemplaza.
+ipcMain.handle('rc-exp-subir', async (event, folderName, nombreBase, titulo) => {
+  try {
+    const dir = expedienteDir(folderName);
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: String(titulo || 'Subir archivo'),
+      buttonLabel: 'Subir',
+      properties: ['openFile'],
+      filters: [{ name: 'PDF o imagen escaneada', extensions: ['pdf', 'jpg', 'jpeg', 'png', 'tif', 'tiff'] }, { name: 'Todos los archivos', extensions: ['*'] }]
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    const origen = result.filePaths[0];
+    const destino = expedienteFile(folderName, String(nombreBase || 'archivo') + path.extname(origen).toLowerCase());
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(origen, destino);
+    return { ok: true, name: path.basename(destino) };
+  } catch (err) {
+    writeLog('rc-exp-subir ERROR:', err);
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('rc-exp-trash', async (event, folderName, fileName) => {
   try {
     await shell.trashItem(expedienteFile(folderName, fileName));
@@ -571,8 +616,6 @@ ipcMain.handle('rc-pdf', async (event, payload) => {
   const opts = payload || {};
   if (!String(opts.bodyHtml || '').trim()) return { ok: false, error: 'sin-contenido' };
   const title = String(opts.title || 'documento');
-  let tmp = null;
-  let win = null;
   try {
     const info = folderInfo();
     const carpeta = info.exists ? path.join(info.path, 'PDF') : app.getPath('documents');
@@ -582,14 +625,7 @@ ipcMain.handle('rc-pdf', async (event, payload) => {
       filters: [{ name: 'Documento PDF', extensions: ['pdf'] }]
     });
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
-    tmp = path.join(os.tmpdir(), 'rc-pdf-' + Date.now() + '.html');
-    fs.writeFileSync(tmp, documentoImprimible({ bodyHtml: opts.bodyHtml, pageSize: opts.pageSize || 'Letter', landscape: !!opts.landscape, margen: opts.margen, title, aviso: false }), 'utf8');
-    win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
-    await win.loadFile(tmp);
-    // La fuente del documento llega por internet: un momento para que se
-    // aplique (sin conexión se usa Georgia, como en el editor).
-    await new Promise(r => setTimeout(r, 600));
-    const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true });
+    const pdf = await generarPdf(opts, title);
     fs.mkdirSync(path.dirname(result.filePath), { recursive: true });
     fs.writeFileSync(result.filePath, pdf);
     lastPdfPath = result.filePath;
@@ -598,11 +634,27 @@ ipcMain.handle('rc-pdf', async (event, payload) => {
   } catch (err) {
     writeLog('rc-pdf ERROR:', err);
     return { ok: false, error: err.message };
-  } finally {
-    if (win && !win.isDestroyed()) win.destroy();
-    if (tmp) fs.unlink(tmp, () => {});
   }
 });
+
+// PDF de un documento (papel, orientación y márgenes del redactor) con una
+// ventana oculta, sin pasar por el navegador.
+async function generarPdf(opts, title) {
+  const tmp = path.join(os.tmpdir(), 'rc-pdf-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.html');
+  let win = null;
+  try {
+    fs.writeFileSync(tmp, documentoImprimible({ bodyHtml: opts.bodyHtml, pageSize: opts.pageSize || 'Letter', landscape: !!opts.landscape, margen: opts.margen, title, aviso: false }), 'utf8');
+    win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
+    await win.loadFile(tmp);
+    // La fuente del documento llega por internet: un momento para que se
+    // aplique (sin conexión se usa Georgia, como en el editor).
+    await new Promise(r => setTimeout(r, 600));
+    return await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true });
+  } finally {
+    if (win && !win.isDestroyed()) win.destroy();
+    fs.unlink(tmp, () => {});
+  }
+}
 
 ipcMain.handle('rc-pdf-open', async () => {
   if (!lastPdfPath) return { ok: false };
