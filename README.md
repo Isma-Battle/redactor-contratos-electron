@@ -274,7 +274,7 @@ npm run dist:mac      # .dmg — solo se puede generar desde macOS
 npm run dist:linux    # AppImage
 ```
 
-Los archivos generados quedan en la carpeta `dist/`.
+Los archivos generados quedan en `C:\Users\<usuario>\RENTHOUSE-dist` (fuera de OneDrive: si se generan dentro, OneDrive bloquea el .exe mientras se le pone el icono y la compilación tiene que reintentar).
 
 > Nota: para generar un `.exe` firmado o un `.dmg` notarizado necesitas compilar
 > desde el sistema operativo correspondiente (Windows para `.exe`, macOS para

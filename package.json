@@ -28,7 +28,7 @@
     "appId": "com.redactordecontratos.app",
     "productName": "Redactor de Contratos",
     "directories": {
-      "output": "dist"
+      "output": "../../../RENTHOUSE-dist"
     },
     "files": [
       "main.js",
